@@ -25,7 +25,7 @@ class SmallWorldNetworkModel(mesa.Model):
         human_creation_rate=1,  # New humans per step
         bot_creation_rate=3,   # New bots per step
         connection_rewiring_prob=0.1,  # For small world network
-        topic_shift_frequency=30,  # Steps between major topic shifts
+        topic_shift_frequency=1,  # Steps between major topic shifts
         dimensions=5,  # Dimensions in topic space
         # New parameters to handle slider values
         human_human_positive_bias=None,
@@ -253,7 +253,7 @@ class SmallWorldNetworkModel(mesa.Model):
             agents_added = True
 
         # If we added any agents, recreate the network to accommodate them
-        if agents_added or (self.steps == 0):  # Also update at initialization
+        if agents_added:  # Always update when agents are added
             # Recreate the network with the current agent count
             self.create_network()
             self.update_agent_connections()
@@ -301,10 +301,9 @@ class SmallWorldNetworkModel(mesa.Model):
         # Create new agents
         self.create_new_agents()
 
-        # NOTE: Network rewiring is disabled
         # Periodically rewire the network to simulate changing trends
-        # if self.steps % self.topic_shift_frequency == 0:
-        #     self.rewire_network()
+        if self.steps % self.topic_shift_frequency == 0:
+            self.rewire_network()
 
         # Update agent counters
         self.update_agent_counts()

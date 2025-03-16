@@ -8,8 +8,6 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
-import io
-import base64
 from functools import partial
 
 from model import SmallWorldNetworkModel
@@ -21,9 +19,20 @@ def clear_all_figures():
 
 
 def network_visualization(model):
-    """Creates a network visualization of the social media model"""
+    """Creates a network visualization of the social media model or placeholder for step 0."""
     # Create a figure with a specific figure number to avoid duplicates
     fig, ax = plt.subplots(figsize=(5, 5))
+
+    # If we're at step 0, show a placeholder message instead of the network
+    if model.steps == 0:
+        ax.text(0.5, 0.5, "Network visualization will appear after the first step.\n\n"
+                          "Please adjust parameters and click 'Step' to begin.",
+                ha='center', va='center', fontsize=12)
+        ax.axis('off')
+        plt.tight_layout()
+        return fig
+
+    # Otherwise, create the normal network visualization
     G = nx.Graph()
 
     # Get all active agents
@@ -169,10 +178,6 @@ class SimulationState:
         self.model_data_list.append(row)
         self.update_counter += 1
 
-    def add_data_rows(self, rows):
-        self.model_data_list.extend(rows)
-        self.update_counter += 1
-
     def set_model(self, model):
         self.model = model
         self.model_data_list = []
@@ -199,10 +204,10 @@ class SimulationState:
 def SocialMediaDashboard():
     """Main dashboard component for the social media simulation"""
     # Model parameters with state
-    num_initial_humans, set_num_initial_humans = solara.use_state(400)
-    num_initial_bots, set_num_initial_bots = solara.use_state(100)
+    num_initial_humans, set_num_initial_humans = solara.use_state(100)
+    num_initial_bots, set_num_initial_bots = solara.use_state(20)
     human_creation_rate, set_human_creation_rate = solara.use_state(5)
-    bot_creation_rate, set_bot_creation_rate = solara.use_state(20)
+    bot_creation_rate, set_bot_creation_rate = solara.use_state(5)
     connection_rewiring_prob, set_connection_rewiring_prob = solara.use_state(0.1)
     topic_shift_frequency, set_topic_shift_frequency = solara.use_state(30)
     human_human_positive_bias, set_human_human_positive_bias = solara.use_state(0.7)
@@ -212,10 +217,6 @@ def SocialMediaDashboard():
 
     # Flag to indicate parameters have changed
     params_changed, set_params_changed = solara.use_state(False)
-
-    # Simulation control values - unified state
-    is_running, set_is_running = solara.use_state(False)
-    step_size, set_step_size = solara.use_state(1)
 
     # Create a unified simulation state to prevent multiple rerenders
     sim_state, set_sim_state = solara.use_state(SimulationState())
@@ -268,9 +269,6 @@ def SocialMediaDashboard():
         # Clear the params_changed flag
         set_params_changed(False)
 
-        # Make sure to stop auto-running when initializing a new model
-        set_is_running(False)
-
     # Initialize the model if it's None
     if sim_state.model is None:
         initialize_model()
@@ -298,51 +296,6 @@ def SocialMediaDashboard():
 
             # Update the state just once
             set_sim_state(new_state)
-
-    # Function to run multiple steps
-    def run_steps():
-        if sim_state.model:
-            # Clear all figures
-            clear_all_figures()
-
-            # Create a new state object to update atomically
-            new_state = SimulationState()
-            new_state.model = sim_state.model
-            new_state.model_data_list = sim_state.model_data_list.copy()
-
-            # Run all steps before updating state
-            new_data_rows = []
-
-            for _ in range(step_size):
-                # Step the model
-                new_state.model.step()
-
-                # Collect data
-                df_row = new_state.model.datacollector.get_model_vars_dataframe().iloc[-1:].to_dict('records')[0]
-                df_row['step'] = new_state.model.steps
-                new_data_rows.append(df_row)
-
-            # Add all new data rows at once
-            new_state.add_data_rows(new_data_rows)
-
-            # Update the state just once
-            set_sim_state(new_state)
-
-    # Reset button function
-    def reset():
-        # Close all plots to ensure cleanup
-        clear_all_figures()
-        # Stop auto-stepping
-        set_is_running(False)
-        # Initialize a new model (which creates a new simulation state)
-        initialize_model()
-
-    # Use Solara's timer for auto-stepping
-    def auto_step_callback():
-        if is_running and sim_state.model:
-            run_steps()
-
-    solara.use_timer(1.0, auto_step_callback, active=is_running)
 
     # Convert model_data_list to DataFrame for plotting using memoization
     def get_model_dataframe():
@@ -386,7 +339,12 @@ def SocialMediaDashboard():
                 with solara.Card(title="Initial Parameters"):
                     # Add a warning if parameters have changed
                     if params_changed:
-                        solara.Text("Parameters have changed. Click 'Initialize' to apply.")
+                        with solara.Row():
+                            solara.Text("Parameters have changed.")
+                            solara.Button(
+                                label="Apply Changes",
+                                on_click=initialize_model
+                            )
 
                     # Initial Population and Growth Rates
                     solara.Markdown("### Initial Population")
@@ -402,7 +360,7 @@ def SocialMediaDashboard():
                     solara.Text(f"Initial Bots: {num_initial_bots}")
                     solara.SliderInt(
                         label="Initial Bots",
-                        min=0,
+                        min=20,
                         max=500,
                         value=num_initial_bots,
                         on_value=lambda v: update_param(v, set_num_initial_bots)
@@ -413,7 +371,7 @@ def SocialMediaDashboard():
                     solara.SliderFloat(
                         label="Human Creation Rate",
                         min=0,
-                        max=15,
+                        max=10,
                         step=1,
                         value=human_creation_rate,
                         on_value=lambda v: update_param(v, set_human_creation_rate)
@@ -423,7 +381,7 @@ def SocialMediaDashboard():
                     solara.SliderFloat(
                         label="Bot Creation Rate",
                         min=1,
-                        max=30,
+                        max=10,
                         step=1,
                         value=bot_creation_rate,
                         on_value=lambda v: update_param(v, set_bot_creation_rate)
@@ -441,7 +399,7 @@ def SocialMediaDashboard():
 
         # Second row - Network Parameters and Simulation Controls
         with solara.Row():
-            # Network & Interactions - much wider now (left)
+            # Network & Interactions - wider now (left)
             with solara.Column(classes=["w-3/4"]):
                 with solara.Card(title="Network & Interactions"):
                     with solara.Row():
@@ -508,37 +466,11 @@ def SocialMediaDashboard():
                                 on_value=lambda v: update_param(v, set_seed)
                             )
 
-            # Simulation Controls and Current State - moved far right
+            # Simulation Control and Current State - right side
             with solara.Column(classes=["w-1/4"]):
-                # Simulation controls
-                with solara.Card(title="Simulation Controls"):
-                    # First row of controls - now with 4 columns to include multi-step button
-                    with solara.Row():
-                        with solara.Column(classes=["w-1/4"]):
-                            solara.Button(
-                                label="Initialize" if not params_changed else "Initialize (Apply Changes)",
-                                on_click=reset
-                            )
-                        with solara.Column(classes=["w-1/4"]):
-                            solara.Button(label="Step", on_click=step)
-                        with solara.Column(classes=["w-1/4"]):
-                            solara.Button(label=f"Run {step_size} Steps", on_click=run_steps)
-                        with solara.Column(classes=["w-1/4"]):
-                            solara.Button(
-                                label="Auto Run" if not is_running else "Pause",
-                                on_click=lambda: set_is_running(not is_running)
-                            )
-
-                    # Second row with steps slider
-                    with solara.Row():
-                        solara.Text(f"Steps per Click: {step_size}")
-                        solara.SliderInt(
-                            label="Steps per Click",
-                            min=1,
-                            max=30,
-                            value=step_size,
-                            on_value=lambda v: set_step_size(v)
-                        )
+                # Simplified simulation controls - only Step button
+                with solara.Card(title="Simulation Control"):
+                    solara.Button(label="Step", on_click=step)
 
                 # Current state display
                 if sim_state.model:
