@@ -293,6 +293,26 @@ class SmallWorldNetworkModel(mesa.Model):
             return sum(satisfactions) / len(satisfactions)
         return 0
 
+    def decay_connections(self):
+        """Randomly decay some connections to prevent over-connectivity."""
+        # Get all active agents
+        active_agents = [agent for agent in self.agents if agent.active]
+
+        # For each agent, randomly remove some connections
+        for agent in active_agents:
+            connections_to_remove = []
+            for connection_id in agent.connections:
+                # 0.5% chance to decay each connection per step
+                if self.random.random() < 0.005:
+                    connections_to_remove.append(connection_id)
+
+            # Remove the selected connections
+            for connection_id in connections_to_remove:
+                connected_agent = self.get_agent_by_id(connection_id)
+                if connected_agent:
+                    agent.remove_connection(connected_agent)
+
+    # Call it in the step method
     def step(self):
         """Advance the model by one step."""
         # Execute agent steps (using the Mesa 3.1.4 syntax)
@@ -301,9 +321,12 @@ class SmallWorldNetworkModel(mesa.Model):
         # Create new agents
         self.create_new_agents()
 
-        # Periodically rewire the network to simulate changing trends
-        if self.steps % self.topic_shift_frequency == 0:
-            self.rewire_network()
+        # # Periodically rewire the network to simulate changing trends
+        # if self.steps % self.topic_shift_frequency == 0:
+        #     self.rewire_network()
+
+        # Apply natural connection decay
+        self.decay_connections()
 
         # Update agent counters
         self.update_agent_counts()

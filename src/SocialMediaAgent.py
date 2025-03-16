@@ -58,8 +58,17 @@ class SocialMediaAgent(mesa.Agent):
 
     def add_connection(self, other_agent):
         """Add a connection to another agent."""
-        self.connections.add(other_agent.unique_id)
-        other_agent.connections.add(self.unique_id)
+        # Add a connection limit (e.g., 20 for humans, 50 for bots)
+        connection_limit = 20 if self.agent_type == "human" else 50
+
+        # Only add if under the limit
+        if len(self.connections) < connection_limit:
+            self.connections.add(other_agent.unique_id)
+
+            # Only add the reverse connection if the other agent is also under their limit
+            other_limit = 20 if other_agent.agent_type == "human" else 50
+            if len(other_agent.connections) < other_limit:
+                other_agent.connections.add(self.unique_id)
 
     def remove_connection(self, other_agent):
         """Remove a connection to another agent."""
