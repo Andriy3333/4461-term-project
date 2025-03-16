@@ -56,7 +56,6 @@ class SmallWorldNetworkModel(mesa.Model):
         self.human_satisfaction_init = human_satisfaction_init if human_satisfaction_init is not None else constants.DEFAULT_HUMAN_SATISFACTION_INIT
 
         # Initialize counters and trackers
-        # Note: self.steps is now automatically managed by Mesa 3.0+
         self.next_id = 0
         self.active_humans = 0
         self.active_bots = 0
