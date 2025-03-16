@@ -209,6 +209,9 @@ def SocialMediaDashboard():
     human_creation_rate, set_human_creation_rate = solara.use_state(1)
     bot_creation_rate, set_bot_creation_rate = solara.use_state(3)
 
+    # New state for bot ban rate multiplier
+    bot_ban_rate_multiplier, set_bot_ban_rate_multiplier = solara.use_state(1.0)
+
     # Hidden parameters - not displayed in UI but used in model
     connection_rewiring_prob, set_connection_rewiring_prob = solara.use_state(0.1)
     topic_shift_frequency, set_topic_shift_frequency = solara.use_state(30)
@@ -237,6 +240,7 @@ def SocialMediaDashboard():
         print(f"Initial Bots: {num_initial_bots}")
         print(f"Human Creation Rate: {human_creation_rate}")
         print(f"Bot Creation Rate: {bot_creation_rate}")
+        print(f"Bot Ban Rate Multiplier: {bot_ban_rate_multiplier}")
         print(f"Connection Rewiring: {connection_rewiring_prob}")
         print(f"Topic Shift Frequency: {topic_shift_frequency}")
         print(f"Human-Human Bias: {human_human_positive_bias}")
@@ -249,6 +253,7 @@ def SocialMediaDashboard():
             num_initial_bots=num_initial_bots,
             human_creation_rate=human_creation_rate,
             bot_creation_rate=bot_creation_rate,
+            bot_ban_rate_multiplier=bot_ban_rate_multiplier,
             connection_rewiring_prob=connection_rewiring_prob,
             topic_shift_frequency=topic_shift_frequency,
             human_human_positive_bias=human_human_positive_bias,
@@ -414,6 +419,18 @@ def SocialMediaDashboard():
                         step=1,
                         value=bot_creation_rate,
                         on_value=lambda v: update_param(v, set_bot_creation_rate)
+                    )
+
+                    # Add new slider for Bot Ban Rate
+                    solara.Markdown("### Bot Ban Rate")
+                    solara.Text(f"Bot Ban Rate Multiplier: {bot_ban_rate_multiplier:.2f}x")
+                    solara.SliderFloat(
+                        label="Ban Rate Multiplier",
+                        min=0.1,
+                        max=2.0,
+                        step=0.1,
+                        value=bot_ban_rate_multiplier,
+                        on_value=lambda v: update_param(v, set_bot_ban_rate_multiplier)
                     )
 
             # Social Network Graph (middle)

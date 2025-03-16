@@ -24,6 +24,7 @@ class SmallWorldNetworkModel(mesa.Model):
         num_initial_bots=20,
         human_creation_rate=1,  # New humans per step
         bot_creation_rate=3,   # New bots per step
+        bot_ban_rate_multiplier=1.0,  # NEW: Multiplier for bot ban rates
         connection_rewiring_prob=0.1,  # For small world network
         topic_shift_frequency=1,  # Steps between major topic shifts
         dimensions=5,  # Dimensions in topic space
@@ -43,6 +44,7 @@ class SmallWorldNetworkModel(mesa.Model):
         self.num_initial_bots = num_initial_bots
         self.human_creation_rate = human_creation_rate
         self.bot_creation_rate = bot_creation_rate
+        self.bot_ban_rate_multiplier = bot_ban_rate_multiplier  # NEW
         self.connection_rewiring_prob = connection_rewiring_prob
         self.topic_shift_frequency = topic_shift_frequency
         self.dimensions = dimensions
@@ -122,6 +124,12 @@ class SmallWorldNetworkModel(mesa.Model):
 
         # Create initial connections based on network topology
         self.update_agent_connections()
+
+    def adjust_bot_detection_rate(self, bot):
+        """Adjust a bot's detection rate based on the global multiplier."""
+        if hasattr(bot, 'detection_rate'):
+            # Apply the multiplier to the bot's detection rate
+            bot.detection_rate = bot.detection_rate * self.bot_ban_rate_multiplier
 
     # In model.py - update_agent_connections method
     def update_agent_connections(self):
@@ -249,6 +257,8 @@ class SmallWorldNetworkModel(mesa.Model):
         num_new_bots = self.np_random.poisson(self.bot_creation_rate)
         for _ in range(num_new_bots):
             agent = BotAgent(model=self)  # Updated for Mesa 3.1.4
+            # Apply the bot ban rate multiplier to new bots
+            self.adjust_bot_detection_rate(agent)
             self.active_bots += 1
             agents_added = True
 
@@ -321,9 +331,9 @@ class SmallWorldNetworkModel(mesa.Model):
         # Create new agents
         self.create_new_agents()
 
-        # # Periodically rewire the network to simulate changing trends
-        # if self.steps % self.topic_shift_frequency == 0:
-        #     self.rewire_network()
+        # Periodically rewire the network to simulate changing trends
+        if self.steps % self.topic_shift_frequency == 0:
+            self.rewire_network()
 
         # Apply natural connection decay
         self.decay_connections()
