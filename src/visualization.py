@@ -8,7 +8,6 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
-import threading
 import io
 import base64
 from functools import partial
@@ -27,23 +26,32 @@ def network_visualization(model):
     fig, ax = plt.subplots(figsize=(5, 5))
     G = nx.Graph()
 
-    # Add nodes - but only for agents that have connections
-    active_agents = [agent for agent in model.agents
-                     if agent.active and len(agent.connections) > 0]
+    # Get all active agents
+    all_active_agents = [agent for agent in model.agents if agent.active]
 
-    for agent in active_agents:
+    # Count agents by type and connection status
+    all_humans = [a for a in all_active_agents if a.agent_type == 'human']
+    all_bots = [a for a in all_active_agents if a.agent_type == 'bot']
+
+    connected_humans = [a for a in all_humans if len(a.connections) > 0]
+    connected_bots = [a for a in all_bots if len(a.connections) > 0]
+
+    # Add nodes - but only for agents that have connections
+    connected_agents = [agent for agent in all_active_agents if len(agent.connections) > 0]
+
+    for agent in connected_agents:
         G.add_node(agent.unique_id,
                    agent_type=agent.agent_type,
                    satisfaction=getattr(agent, "satisfaction", 0))
 
     # Add edges from connections
-    for agent in active_agents:
+    for agent in connected_agents:
         for connection_id in agent.connections:
             if G.has_node(connection_id):  # Make sure the connection exists
                 G.add_edge(agent.unique_id, connection_id)
 
     # Position nodes using a layout algorithm
-    pos = nx.spring_layout(G, seed=model.random.randint(0, 2**32-1))
+    pos = nx.spring_layout(G, seed=model.random.randint(0, 2 ** 32 - 1))
 
     # Get node colors based on agent type
     node_colors = []
@@ -61,9 +69,11 @@ def network_visualization(model):
     nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=node_sizes, alpha=0.8, ax=ax)
     nx.draw_networkx_edges(G, pos, width=0.5, alpha=0.5, ax=ax)
 
-    # Add legend
-    ax.plot([0], [0], 'o', color='blue', label='Human')
-    ax.plot([0], [0], 'o', color='red', label='Bot')
+    # Add legend with counts
+    ax.plot([0], [0], 'o', color='blue',
+            label=f'Connected Humans: {len(connected_humans)}/{len(all_humans)}')
+    ax.plot([0], [0], 'o', color='red',
+            label=f'Connected Bots: {len(connected_bots)}/{len(all_bots)}')
     ax.legend(fontsize=8)
 
     ax.set_title(f"Social Network (Step {model.steps})", fontsize=10)
@@ -182,7 +192,9 @@ class SimulationState:
 
     def get_avg_human_satisfaction(self):
         return self.model.get_avg_human_satisfaction() if self.model else 0
-    # Create a Solara dashboard component
+
+
+# Create a Solara dashboard component
 @solara.component
 def SocialMediaDashboard():
     """Main dashboard component for the social media simulation"""
@@ -207,11 +219,6 @@ def SocialMediaDashboard():
 
     # Create a unified simulation state to prevent multiple rerenders
     sim_state, set_sim_state = solara.use_state(SimulationState())
-
-    # Debug counter to track renders - uncomment if needed
-    # render_count, set_render_count = solara.use_state(0)
-    # print(f"Dashboard rendering: {render_count}")
-    # solara.use_effect(lambda: set_render_count(render_count + 1), [])
 
     # Function to update a parameter and mark as changed
     def update_param(value, setter):
@@ -260,6 +267,9 @@ def SocialMediaDashboard():
 
         # Clear the params_changed flag
         set_params_changed(False)
+
+        # Make sure to stop auto-running when initializing a new model
+        set_is_running(False)
 
     # Initialize the model if it's None
     if sim_state.model is None:
@@ -327,49 +337,12 @@ def SocialMediaDashboard():
         # Initialize a new model (which creates a new simulation state)
         initialize_model()
 
-    # Background auto-stepping using a side effect
-    def auto_step_effect():
-        # Only set up auto-stepping when running is true
-        if not is_running:
-            return None
+    # Use Solara's timer for auto-stepping
+    def auto_step_callback():
+        if is_running and sim_state.model:
+            run_steps()
 
-        # Use a list to hold the timer reference for proper cleanup
-        timer_ref = [None]
-
-        # Function to execute in a timer
-        def timer_callback():
-            # This runs in a background thread
-            if is_running:
-                # Create a flag to indicate that we need to update the UI
-                run_steps_flag = [True]
-
-                # We need to trigger a UI update from the main thread
-                # Use an event to synchronize
-                def trigger_update():
-                    if run_steps_flag[0]:  # Only run if the flag is still True
-                        run_steps()
-                        run_steps_flag[0] = False  # Set the flag to False to avoid multiple runs
-
-                # Schedule the update for the main thread
-                solara.use_timer(0.1, trigger_update, once=True)
-
-                # Schedule the next step after a delay
-                timer_ref[0] = threading.Timer(1.0, timer_callback)
-                timer_ref[0].start()
-
-        # Start the timer
-        timer_ref[0] = threading.Timer(1.0, timer_callback)
-        timer_ref[0].start()
-
-        # Return a proper cleanup function
-        def cleanup():
-            if timer_ref[0]:
-                timer_ref[0].cancel()
-
-        return cleanup
-
-    # Set up the auto-stepping effect when is_running changes
-    solara.use_effect(auto_step_effect, [is_running, step_size])
+    solara.use_timer(1.0, auto_step_callback, active=is_running)
 
     # Convert model_data_list to DataFrame for plotting using memoization
     def get_model_dataframe():
@@ -539,18 +512,20 @@ def SocialMediaDashboard():
             with solara.Column(classes=["w-1/4"]):
                 # Simulation controls
                 with solara.Card(title="Simulation Controls"):
-                    # First row of controls
+                    # First row of controls - now with 4 columns to include multi-step button
                     with solara.Row():
-                        with solara.Column(classes=["w-1/3"]):
+                        with solara.Column(classes=["w-1/4"]):
                             solara.Button(
                                 label="Initialize" if not params_changed else "Initialize (Apply Changes)",
                                 on_click=reset
                             )
-                        with solara.Column(classes=["w-1/3"]):
+                        with solara.Column(classes=["w-1/4"]):
                             solara.Button(label="Step", on_click=step)
-                        with solara.Column(classes=["w-1/3"]):
+                        with solara.Column(classes=["w-1/4"]):
+                            solara.Button(label=f"Run {step_size} Steps", on_click=run_steps)
+                        with solara.Column(classes=["w-1/4"]):
                             solara.Button(
-                                label="Run" if not is_running else "Pause",
+                                label="Auto Run" if not is_running else "Pause",
                                 on_click=lambda: set_is_running(not is_running)
                             )
 

@@ -94,13 +94,11 @@ class SmallWorldNetworkModel(mesa.Model):
         return next_id
 
     def create_network(self):
-        """Create a small world network for agent connections."""
-        # We'll use a NetworkX small world graph as the basis
-        # This will just store the structure, agents are stored in the schedule
-
-        # Start with a ring lattice
-        n = max(5, self.num_initial_humans + self.num_initial_bots)  # Ensure at least 5 nodes
-        k = min(4, n-1)  # Each node connected to k nearest neighbors, but can't exceed n-1
+        """Create a small world network for agent connections with current agent count."""
+        # Get current count of active agents for network size
+        active_agents = [agent for agent in self.agents if agent.active]
+        n = max(5, len(active_agents))  # Use current agent count, ensure at least 5 nodes
+        k = min(4, n - 1)  # Each node connected to k nearest neighbors, but can't exceed n-1
 
         # Use the model's random number generator for reproducibility
         self.network = nx.watts_strogatz_graph(
@@ -236,18 +234,29 @@ class SmallWorldNetworkModel(mesa.Model):
         return (similarity + 1) / 2
 
     def create_new_agents(self):
-        """Create new agents based on creation rates."""
+        """Create new agents based on creation rates and immediately update the network."""
+        # Track if we added any agents
+        agents_added = False
+
         # Create new humans - Use np_random for Poisson distribution
         num_new_humans = self.np_random.poisson(self.human_creation_rate)
         for _ in range(num_new_humans):
             agent = HumanAgent(model=self)  # Updated for Mesa 3.1.4
             self.active_humans += 1
+            agents_added = True
 
         # Create new bots - Use np_random for Poisson distribution
         num_new_bots = self.np_random.poisson(self.bot_creation_rate)
         for _ in range(num_new_bots):
             agent = BotAgent(model=self)  # Updated for Mesa 3.1.4
             self.active_bots += 1
+            agents_added = True
+
+        # If we added any agents, recreate the network to accommodate them
+        if agents_added or (self.steps == 0):  # Also update at initialization
+            # Recreate the network with the current agent count
+            self.create_network()
+            self.update_agent_connections()
 
     def update_agent_counts(self):
         """Update counters for active and deactivated agents."""

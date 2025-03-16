@@ -20,7 +20,7 @@ class BotAgent(SocialMediaAgent):
         self.agent_type = "bot"
 
         # Bot characteristics - use model's RNG
-        self.detection_rate = model.random.uniform(0.3, 0.9)  # Higher means harder to detect
+        self.detection_rate = 0
         self.malicious_post_rate = model.random.uniform(0.01, 1)
         # Use model's numpy RNG wrapper
         self.topic_position = model.np_random.normal(0, 1, size=5)  # Fixed topic position
