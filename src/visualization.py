@@ -1,6 +1,6 @@
 """
 visualization.py - Solara visualization for social media simulation
-using Mesa 3.1.4 and Solara 1.44.1
+using Mesa 3.1.4 and Solara 1.44.1 with batch step buttons
 """
 
 import solara
@@ -26,7 +26,7 @@ def network_visualization(model):
     # If we're at step 0, show a placeholder message instead of the network
     if model.steps == 0:
         ax.text(0.5, 0.5, "Network visualization will appear after the first step.\n\n"
-                          "Please adjust parameters and click 'Step' to begin.",
+                          "Press apply changes if changing parameters.",
                 ha='center', va='center', fontsize=12)
         ax.axis('off')
         plt.tight_layout()
@@ -204,15 +204,19 @@ class SimulationState:
 def SocialMediaDashboard():
     """Main dashboard component for the social media simulation"""
     # Model parameters with state
-    num_initial_humans, set_num_initial_humans = solara.use_state(100)
-    num_initial_bots, set_num_initial_bots = solara.use_state(20)
-    human_creation_rate, set_human_creation_rate = solara.use_state(5)
-    bot_creation_rate, set_bot_creation_rate = solara.use_state(5)
+    num_initial_humans, set_num_initial_humans = solara.use_state(200)
+    num_initial_bots, set_num_initial_bots = solara.use_state(40)
+    human_creation_rate, set_human_creation_rate = solara.use_state(1)
+    bot_creation_rate, set_bot_creation_rate = solara.use_state(3)
+
+    # Hidden parameters - not displayed in UI but used in model
     connection_rewiring_prob, set_connection_rewiring_prob = solara.use_state(0.1)
     topic_shift_frequency, set_topic_shift_frequency = solara.use_state(30)
-    human_human_positive_bias, set_human_human_positive_bias = solara.use_state(0.7)
-    human_bot_negative_bias, set_human_bot_negative_bias = solara.use_state(0.8)
     human_satisfaction_init, set_human_satisfaction_init = solara.use_state(100)
+
+    # Network & Interactions parameters
+    human_human_positive_bias, set_human_human_positive_bias = solara.use_state(0.65)
+    human_bot_negative_bias, set_human_bot_negative_bias = solara.use_state(0.65)
     seed, set_seed = solara.use_state(42)
 
     # Flag to indicate parameters have changed
@@ -295,6 +299,31 @@ def SocialMediaDashboard():
             new_state.add_data_row(df_row)
 
             # Update the state just once
+            set_sim_state(new_state)
+
+    # Function to run multiple steps
+    def run_multiple_steps(num_steps):
+        # Make a copy of the current state so we only update once at the end
+        if sim_state.model:
+            # Clear figures once
+            clear_all_figures()
+
+            # Make a deep copy of the state
+            new_state = SimulationState()
+            new_state.model = sim_state.model  # This is a reference, not a copy
+            new_state.model_data_list = sim_state.model_data_list.copy()
+
+            # Run multiple steps
+            for _ in range(num_steps):
+                # Step the model
+                new_state.model.step()
+
+                # Add data for this step
+                df_row = new_state.model.datacollector.get_model_vars_dataframe().iloc[-1:].to_dict('records')[0]
+                df_row['step'] = new_state.model.steps
+                new_state.add_data_row(df_row)
+
+            # Update the state once at the end
             set_sim_state(new_state)
 
     # Convert model_data_list to DataFrame for plotting using memoization
@@ -399,36 +428,18 @@ def SocialMediaDashboard():
 
         # Second row - Network Parameters and Simulation Controls
         with solara.Row():
-            # Network & Interactions - wider now (left)
+            # Network & Interactions plus remaining parameters - wider now (left)
             with solara.Column(classes=["w-3/4"]):
                 with solara.Card(title="Network & Interactions"):
+                    # More space for bias sliders by using 50% width columns
                     with solara.Row():
-                        # Column 1 of parameters
-                        with solara.Column(classes=["w-1/3"]):
-                            solara.Text(f"Connection Rewiring: {connection_rewiring_prob:.2f}")
-                            solara.SliderFloat(
-                                label="Connection Rewiring",
-                                min=0.0,
-                                max=1.0,
-                                step=0.01,
-                                value=connection_rewiring_prob,
-                                on_value=lambda v: update_param(v, set_connection_rewiring_prob)
-                            )
-
-                            solara.Text(f"Topic Shift Frequency: {topic_shift_frequency}")
-                            solara.SliderInt(
-                                label="Topic Shift Frequency",
-                                min=1,
-                                max=100,
-                                value=topic_shift_frequency,
-                                on_value=lambda v: update_param(v, set_topic_shift_frequency)
-                            )
-
-                        # Column 2 of parameters
-                        with solara.Column(classes=["w-1/3"]):
+                        # Column 1 - Human-Human Positive Bias (wider)
+                        with solara.Column(classes=["w-1/2"]):
+                            # Text above slider
                             solara.Text(f"Human-Human Positive Bias: {human_human_positive_bias:.2f}")
+                            # Slider with empty label
                             solara.SliderFloat(
-                                label="Human-Human Positive Bias",
+                                label=" ",  # Empty space as label to satisfy the requirement
                                 min=0.0,
                                 max=1.0,
                                 step=0.01,
@@ -436,9 +447,13 @@ def SocialMediaDashboard():
                                 on_value=lambda v: update_param(v, set_human_human_positive_bias)
                             )
 
+                        # Column 2 - Human-Bot Negative Bias (wider)
+                        with solara.Column(classes=["w-1/2"]):
+                            # Text above slider
                             solara.Text(f"Human-Bot Negative Bias: {human_bot_negative_bias:.2f}")
+                            # Slider with empty label
                             solara.SliderFloat(
-                                label="Human-Bot Negative Bias",
+                                label=" ",  # Empty space as label to satisfy the requirement
                                 min=0.0,
                                 max=1.0,
                                 step=0.01,
@@ -446,31 +461,66 @@ def SocialMediaDashboard():
                                 on_value=lambda v: update_param(v, set_human_bot_negative_bias)
                             )
 
-                        # Column 3 of parameters
-                        with solara.Column(classes=["w-1/3"]):
-                            solara.Text(f"Initial Human Satisfaction: {human_satisfaction_init}")
-                            solara.SliderInt(
-                                label="Initial Human Satisfaction",
-                                min=0,
-                                max=100,
-                                value=human_satisfaction_init,
-                                on_value=lambda v: update_param(v, set_human_satisfaction_init)
-                            )
+                    # Seed input in a separate row for more space
+                    with solara.Row(classes=["mt-4"]):
+                        with solara.Column(classes=["w-full"]):
+                            # Text above input
+                            solara.Text("Random Seed:")
 
-                            solara.Text(f"Random Seed: {seed}")
-                            solara.SliderInt(
-                                label="Random Seed",
-                                min=0,
-                                max=1000,
-                                value=seed,
-                                on_value=lambda v: update_param(v, set_seed)
+                            # Text field for seed value
+                            seed_text, set_seed_text = solara.use_state(str(seed))
+
+                            def on_seed_change(value):
+                                set_seed_text(value)
+                                try:
+                                    # Try to convert to integer
+                                    seed_value = int(value)
+                                    update_param(seed_value, set_seed)
+                                except ValueError:
+                                    # If not a valid integer, don't update
+                                    pass
+
+                            # Input with empty label
+                            solara.InputText(
+                                label=" ",  # Empty space as label to satisfy the requirement
+                                value=seed_text,
+                                on_value=on_seed_change
                             )
 
             # Simulation Control and Current State - right side
             with solara.Column(classes=["w-1/4"]):
-                # Simplified simulation controls - only Step button
+                # Enhanced simulation controls with batch step buttons
                 with solara.Card(title="Simulation Control"):
-                    solara.Button(label="Step", on_click=step)
+                    with solara.Row():
+                        # Regular Step button
+                        solara.Button(
+                            label="Step",
+                            on_click=step,
+                            classes=["mr-2"]
+                        )
+
+                        # Run button - run 10 steps at once
+                        solara.Button(
+                            label="Run 10 Steps",
+                            on_click=lambda: run_multiple_steps(10),
+                            style={"background": "#38a169"}
+                        )
+
+                    with solara.Row(classes=["mt-2"]):
+                        # Run 50 steps button
+                        solara.Button(
+                            label="Run 50 Steps",
+                            on_click=lambda: run_multiple_steps(50),
+                            style={"background": "#2b6cb0"}
+                        )
+
+                        # Run 100 steps button
+                        solara.Button(
+                            label="Run 100 Steps",
+                            on_click=lambda: run_multiple_steps(100),
+                            style={"background": "#805ad5"},
+                            classes=["ml-2"]
+                        )
 
                 # Current state display
                 if sim_state.model:

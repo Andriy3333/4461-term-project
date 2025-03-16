@@ -1,6 +1,6 @@
 {
-  "num_initial_humans": [400],
-  "num_initial_bots": [100],
+  "num_initial_humans": [100],
+  "num_initial_bots": [20],
   "human_human_positive_bias": [0.7],
   "human_bot_negative_bias": [0.7],
   "human_creation_rate": [5.0],
