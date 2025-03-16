@@ -12,8 +12,17 @@ class BotAgent(SocialMediaAgent):
     """Bot agent in the social media simulation."""
 
     def __init__(self, model):
-        # Use model's RNG for reproducibility
-        self.bot_type = model.random.choice(["spam", "misinformation", "astroturfing"])
+        # Use weighted choice to achieve 10:5:5 ratio
+        # 50% spam, 25% misinformation, 25% astroturfing
+        bot_types = ["spam", "misinformation", "astroturfing"]
+        bot_weights = [0.5, 0.25, 0.25]  # 10:5:5 ratio
+
+        # Use model's RNG for reproducibility with weighted choice
+        self.bot_type = model.random.choices(
+            bot_types,
+            weights=bot_weights,
+            k=1
+        )[0]
 
         # Pass only model to super().__init__ in Mesa 3.1.4
         super().__init__(model=model, post_type=self.bot_type)
@@ -33,13 +42,13 @@ class BotAgent(SocialMediaAgent):
         """Configure bot parameters based on type."""
         if self.bot_type == "misinformation":
             self.post_frequency = self.model.random.uniform(0.2, 0.8)
-            self.detection_rate = self.model.random.uniform(0.001, 0.01)
+            self.detection_rate = self.model.random.uniform(0.01, 0.03)
         elif self.bot_type == "spam":
             self.post_frequency = self.model.random.uniform(0.5, 0.99)
-            self.detection_rate = self.model.random.uniform(0.005, 0.02)
+            self.detection_rate = self.model.random.uniform(0.01, 0.07)
         elif self.bot_type == "astroturfing":
             self.post_frequency = self.model.random.uniform(0.2, 0.8)
-            self.detection_rate = self.model.random.uniform(0.001, 0.01)
+            self.detection_rate = self.model.random.uniform(0.01, 0.03)
 
     def step(self):
         """Bot agent behavior during each step."""
