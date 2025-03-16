@@ -58,9 +58,10 @@ This project requires Python 3.13 and the packages inside requirements.txt.
 
 There are two ways to run the simulation:
 
-#### 1. Using the Solara-based visualization (recommended):
+### 1. Using the Solara-based visualization (recommended):
 
 This is the primary method we used to run and visualize the simulation. It contains charts like current human satisfaction, and if you scroll down after starting the simulation it also shows population over time and satisfaction over time.
+Make sure you are in /src
 
 ```
 solara run visualization.py
@@ -78,26 +79,26 @@ IMPORTANT:
 - Satisfaction histogram
 - Population over time charts
 
-#### 2. Blindly run the simulation and view the data:
+### 2. Blindly run the simulation and view the data:
 
 The sweep_config.json file defines the parameter combinations to explore:
 You can modify this file to test different parameter values by adding more options to each array. For example, to test multiple bot creation rates:
 "bot_creation_rate": [10, 20, 30]
 This would run the simulation with all three bot creation rate values while keeping other parameters constant.
 
-# Run with default settings
+#### Run with default settings
 
 python run_sweep.py
 
-# Run with custom configuration file
+#### Run with custom configuration file
 
 python run_sweep.py --config custom_sweep.json
 
-# Run with custom steps and runs per configuration
+#### Run with custom steps and runs per configuration
 
 python run_sweep.py --steps 500 --runs 5
 
-# Run with custom output directory
+#### Run with custom output directory
 
 python run_sweep.py --output my_results
 The sweep results will be saved in the specified output directory (defaults to results/), including:
