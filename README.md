@@ -42,10 +42,9 @@ This project requires Python 3.13 and the packages inside requirements.txt.
 
 ### Installation
 
-1. Clone this repository:
+1. Navigate to the unzipped project. Make sure you are in the project directory. :
 
    ```
-   git clone https://github.com/Andriy3333/4461-term-project.git
    cd 4461-term-project/src
    ```
 
