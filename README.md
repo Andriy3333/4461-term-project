@@ -49,24 +49,7 @@ This project requires Python 3.13 and the packages inside requirements.txt.
    cd 4461-term-project/src
    ```
 
-2. Create a virtual environment (optional but recommended):
-
-   ```
-   python -m venv venv
-   ```
-
-3. Activate the virtual environment:
-
-   - On Windows:
-     ```
-     venv\Scripts\activate
-     ```
-   - On macOS/Linux:
-     ```
-     source venv/bin/activate
-     ```
-
-4. Install the required packages:
+2. Install the required packages:
    ```
    pip3 install -r requirements.txt
    ```
@@ -77,6 +60,8 @@ There are two ways to run the simulation:
 
 #### 1. Using the Solara-based visualization (recommended):
 
+This is the primary method we used to run and visualize the simulation. It contains charts like current human satisfaction, and if you scroll down after starting the simulation it also shows population over time and satisfaction over time.
+
 ```
 solara run visualization.py
 ```
@@ -85,33 +70,20 @@ This will start a web server, and you should see output with a URL (typically ht
 
 IMPORTANT:
 
-1. When changing parameters please click initialize after.
-2. Only use the single step function to advance the simulation.
+1. When changing parameters please click apply changes after.
+2. To go forward in the simulation click one of the step buttons
 
 - Controls for setting simulation parameters
 - Network visualization
 - Satisfaction histogram
 - Population over time charts
 
-#### 2. Run and then check the data:
+#### 2. Blindly run the simulation and view the data:
 
 The sweep_config.json file defines the parameter combinations to explore:
-{
-"num_initial_humans": [400],
-"num_initial_bots": [100],
-"human_human_positive_bias": [0.7],
-"human_bot_negative_bias": [0.7],
-"human_creation_rate": [5.0],
-"bot_creation_rate": [20],
-"connection_rewiring_prob": [0.1],
-"topic_shift_frequency": [30],
-"human_satisfaction_init": [100]
-}
 You can modify this file to test different parameter values by adding more options to each array. For example, to test multiple bot creation rates:
 "bot_creation_rate": [10, 20, 30]
 This would run the simulation with all three bot creation rate values while keeping other parameters constant.
-Running Sweeps
-To run a parameter sweep from the terminal:
 
 # Run with default settings
 
@@ -154,7 +126,7 @@ After running a sweep, you can analyze the results using your preferred data ana
 
 1. **Echo Chamber Mechanism**: The echo chamber formation mechanism has been disabled in the current prototype as it was causing humans and bots to become isolated from each other, as noted by our developer: "It was ruining the simulation as no matter the parameters given, the humans would eventually move into smaller and smaller groups while the bots were left on the periphery."
 
-2. **Parameter Calibration**: Finding the right balance between parameters has been challenging. As our developer noted: "Parameter tuning proved to be another time-consuming obstacle. Finding the right balance between human satisfaction decay rates, bot creation frequencies, and network rewiring probabilities took many iterations." The current bot growth rate appears too high, and the human growth rate too slow compared to real Twitter statistics.
+2. **Parameter Calibration**: Finding the right balance between parameters has been challenging. As our developer noted: "Parameter tuning proved to be another time-consuming obstacle. Finding the right balance between human satisfaction decay rates, bot creation frequencies, and network rewiring probabilities took many iterations."
 
 3. **Specific Parameter Values**: While we have an idea of what ratios should be used, specific starting numbers haven't been fully determined yet, making it difficult to match the simulation to real-world data.
 
