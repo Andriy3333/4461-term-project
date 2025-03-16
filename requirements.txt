@@ -1,0 +1,6 @@
+matplotlib==3.10.1
+numpy==2.2.3
+pandas==2.2.3
+Mesa==3.1.4
+networkx==3.4.2
+solara==1.44.1

@@ -1,0 +1,11 @@
+{
+  "num_initial_humans": [400],
+  "num_initial_bots": [100],
+  "human_human_positive_bias": [0.7],
+  "human_bot_negative_bias": [0.7],
+  "human_creation_rate": [5.0],
+  "bot_creation_rate": [20],
+  "connection_rewiring_prob": [0.1],
+  "topic_shift_frequency": [30],
+  "human_satisfaction_init": [100]
+}
