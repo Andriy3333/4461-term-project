@@ -292,14 +292,13 @@ class SmallWorldNetworkModel(mesa.Model):
         # Create new agents
         self.create_new_agents()
 
+        # NOTE: Network rewiring is disabled
         # Periodically rewire the network to simulate changing trends
-        if self.steps % self.topic_shift_frequency == 0:
-            self.rewire_network()
+        # if self.steps % self.topic_shift_frequency == 0:
+        #     self.rewire_network()
 
         # Update agent counters
         self.update_agent_counts()
 
         # Update data collector
         self.datacollector.collect(self)
-
-        # Note: In Mesa 3.0+, steps counter is automatically incremented
