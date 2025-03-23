@@ -177,22 +177,90 @@ class QuadrantTopicModel(mesa.Model):
         return agents
 
     def create_initial_agents(self):
-        """Create initial human and bot agents."""
-        # Create humans
-        for i in range(self.num_initial_humans):
-            agent = HumanAgent(model=self)
-            self.active_humans += 1
+        """Create initial human and bot agents with proper quadrant distribution."""
+        # Human quadrant target distribution from constants
+        human_dist = self.human_quadrant_attractiveness
 
-            # Place agent in topic space based on its position
-            self.place_agent_in_topic_space(agent)
+        # Calculate number of humans per quadrant based on distribution percentages
+        humans_per_quadrant = {
+            'tech_business': int(self.num_initial_humans * human_dist['tech_business']),
+            'politics_news': int(self.num_initial_humans * human_dist['politics_news']),
+            'hobbies': int(self.num_initial_humans * human_dist['hobbies']),
+            'pop_culture': int(self.num_initial_humans * human_dist['pop_culture'])
+        }
 
-        # Create bots
-        for i in range(self.num_initial_bots):
-            agent = BotAgent(model=self)
-            self.active_bots += 1
+        # Ensure we create exactly num_initial_humans by adding any rounding remainder
+        remainder = self.num_initial_humans - sum(humans_per_quadrant.values())
+        if remainder > 0:
+            # Add remainder to the quadrant with highest percentage
+            max_quadrant = max(human_dist, key=human_dist.get)
+            humans_per_quadrant[max_quadrant] += remainder
 
-            # Place agent in topic space based on its position
-            self.place_agent_in_topic_space(agent)
+        # Bot quadrant target distribution from constants
+        bot_dist = self.bot_quadrant_attractiveness
+
+        # Calculate number of bots per quadrant based on distribution percentages
+        bots_per_quadrant = {
+            'tech_business': int(self.num_initial_bots * bot_dist['tech_business']),
+            'politics_news': int(self.num_initial_bots * bot_dist['politics_news']),
+            'hobbies': int(self.num_initial_bots * bot_dist['hobbies']),
+            'pop_culture': int(self.num_initial_bots * bot_dist['pop_culture'])
+        }
+
+        # Ensure we create exactly num_initial_bots by adding any rounding remainder
+        remainder = self.num_initial_bots - sum(bots_per_quadrant.values())
+        if remainder > 0:
+            # Add remainder to the quadrant with highest percentage
+            max_quadrant = max(bot_dist, key=bot_dist.get)
+            bots_per_quadrant[max_quadrant] += remainder
+
+        # Create humans according to distribution
+        for quadrant, count in humans_per_quadrant.items():
+            for i in range(count):
+                agent = HumanAgent(model=self)
+                self.active_humans += 1
+
+                # Set topic position based on quadrant
+                self.set_agent_position_in_quadrant(agent, quadrant)
+
+                # Place agent in topic space based on its position
+                self.place_agent_in_topic_space(agent)
+
+        # Create bots according to distribution
+        for quadrant, count in bots_per_quadrant.items():
+            for i in range(count):
+                agent = BotAgent(model=self)
+                self.active_bots += 1
+
+                # Set topic position based on quadrant
+                self.set_agent_position_in_quadrant(agent, quadrant)
+
+                # Place agent in topic space based on its position
+                self.place_agent_in_topic_space(agent)
+
+    def set_agent_position_in_quadrant(self, agent, quadrant):
+        """Set agent position to be within the specified quadrant with some randomness."""
+        # Define quadrant boundaries (min_x, min_y, max_x, max_y)
+        quadrant_bounds = {
+            'tech_business': (0.0, 0.0, 0.5, 0.5),  # Q1
+            'politics_news': (0.0, 0.5, 0.5, 1.0),  # Q2
+            'hobbies': (0.5, 0.0, 1.0, 0.5),  # Q3
+            'pop_culture': (0.5, 0.5, 1.0, 1.0)  # Q4
+        }
+
+        # Get bounds for the specified quadrant
+        min_x, min_y, max_x, max_y = quadrant_bounds[quadrant]
+
+        # Set position with some randomness but stay within quadrant
+        # Use a Beta distribution to slightly favor positions away from boundaries
+        alpha = beta = 2.0  # Parameters for Beta distribution (peaked in middle)
+
+        # Generate positions using beta distribution and scale to quadrant
+        x = min_x + (max_x - min_x) * self.random.betavariate(alpha, beta)
+        y = min_y + (max_y - min_y) * self.random.betavariate(alpha, beta)
+
+        # Update agent's position
+        agent.topic_position = {'x': x, 'y': y}
 
     def create_initial_connections(self):
         """Create initial connections based on topic proximity."""
