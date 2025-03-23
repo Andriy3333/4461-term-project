@@ -262,6 +262,80 @@ class QuadrantTopicModel(mesa.Model):
         # Update agent's position
         agent.topic_position = {'x': x, 'y': y}
 
+    def apply_super_user_gravity(self, agent):
+        """Apply attraction effect of super users on regular agents."""
+        # Skip if agent is a super user - safely check if attribute exists
+        if getattr(agent, "is_super_user", False):
+            return  # Super users aren't affected by other super users
+
+        # Find nearby super users
+        super_users = []
+        for other in self.agents:
+            if (other.active and
+                    getattr(other, "agent_type", "") == "human" and
+                    getattr(other, "is_super_user", False)):
+
+                # Calculate distance
+                x1, y1 = agent.topic_position['x'], agent.topic_position['y']
+                x2, y2 = other.topic_position['x'], other.topic_position['y']
+                distance = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+
+                # Check if within influence radius
+                if distance <= other.influence_radius:
+                    super_users.append((other, distance))
+
+        # If no super users in range, return
+        if not super_users:
+            return
+
+        # Calculate weighted influence of super users
+        total_pull_x = 0
+        total_pull_y = 0
+        total_weight = 0
+
+        for super_user, distance in super_users:
+            # Inverse distance weighting
+            weight = (1 / max(0.1, distance)) * super_user.topic_leadership
+
+            # Direction vector toward super user
+            dir_x = super_user.topic_position['x'] - agent.topic_position['x']
+            dir_y = super_user.topic_position['y'] - agent.topic_position['y']
+
+            # Add weighted pull
+            total_pull_x += dir_x * weight
+            total_pull_y += dir_y * weight
+            total_weight += weight
+
+        # Apply the gravitational effect if there's any pull
+        if total_weight > 0:
+            # Normalize pull
+            pull_x = total_pull_x / total_weight
+            pull_y = total_pull_y / total_weight
+
+            # Determine pull strength based on agent type
+            pull_strength = 0.02  # Base pull strength
+
+            # Bots have type-specific attraction to super users
+            if agent.agent_type == "bot":
+                bot_type = getattr(agent, "bot_type", "")
+                super_user_quadrant = super_users[0][0].get_current_quadrant()
+
+                # Adjust based on bot type and super user's quadrant
+                if bot_type == "spam" and super_user_quadrant in ["pop_culture", "hobbies"]:
+                    pull_strength *= 1.5
+                elif bot_type == "misinformation" and super_user_quadrant == "politics_news":
+                    pull_strength *= 2.0
+                elif bot_type == "astroturfing" and super_user_quadrant == "tech_business":
+                    pull_strength *= 2.0
+
+            # Apply the pull (subtle adjustment to position)
+            agent.topic_position['x'] += pull_x * pull_strength
+            agent.topic_position['y'] += pull_y * pull_strength
+
+            # Ensure position stays in bounds
+            agent.topic_position['x'] = max(0, min(1, agent.topic_position['x']))
+            agent.topic_position['y'] = max(0, min(1, agent.topic_position['y']))
+
     def create_initial_connections(self):
         """Create initial connections based on topic proximity."""
         # Get active agents
@@ -599,8 +673,12 @@ class QuadrantTopicModel(mesa.Model):
 
     def step(self):
         """Advance the model by one step."""
-        # Execute agent steps (using Mesa 3.1.4 syntax)
         self.agents.shuffle_do("step")
+
+        # Apply super user gravity to all agents
+        for agent in self.agents:
+            if agent.active and not getattr(agent, "is_super_user", False):
+                self.apply_super_user_gravity(agent)
 
         # Update agent positions in the topic space
         self.update_agent_positions()

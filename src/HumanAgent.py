@@ -19,6 +19,16 @@ class HumanAgent(SocialMediaAgent):
         # Determine if this is a super-user (10% chance)
         self.is_super_user = model.random.random() < 0.1
 
+        # NEW: Super users get special movement properties
+        if self.is_super_user:
+            self.topic_mobility = model.random.uniform(0.01, 0.03)  # Very small movement (10-30% of regular users)
+            self.influence_radius = model.random.uniform(0.2, 0.3)  # Radius of influence
+            self.topic_leadership = model.random.uniform(0.5, 0.8)  # How strongly they pull others
+        else:
+            self.topic_mobility = model.random.uniform(0.08, 0.12)  # Regular mobility
+            self.influence_radius = 0
+            self.topic_leadership = 0
+
         # Get satisfaction from model if available, otherwise use default 100
         self.satisfaction = getattr(model, "human_satisfaction_init", 100)
 
@@ -103,58 +113,75 @@ class HumanAgent(SocialMediaAgent):
             return 'pop_culture'    # Q4: Casual-Societal (Pop Culture)
 
     def move_in_topic_space(self):
-        """Move in 2D topic space based on quadrant attractiveness."""
-        # Get quadrant attractiveness values from model
-        quadrant_attractiveness = getattr(self.model, 'human_quadrant_attractiveness', {
-            'tech_business': 0.15,
-            'politics_news': 0.20,
-            'hobbies': 0.34,
-            'pop_culture': 0.50
-        })
+        """Move in 2D topic space with persistent target selection."""
 
-        # Combine personal preferences with global attractiveness
-        # 70% personal preference, 30% global trend
-        movement_weights = {}
-        for quadrant in self.quadrant_preferences:
-            movement_weights[quadrant] = (0.7 * self.quadrant_preferences[quadrant] +
-                                         0.3 * quadrant_attractiveness[quadrant])
+        # Initialize persistent properties if they don't exist
+        if not hasattr(self, 'target_commitment'):
+            self.target_commitment = 0
+            self.current_target_quadrant = None
+            self.target_x = None
+            self.target_y = None
 
-        # Normalize weights
-        weight_sum = sum(movement_weights.values())
-        for key in movement_weights:
-            movement_weights[key] /= weight_sum
+        # Check if we need to select a new target
+        if self.target_commitment <= 0 or self.current_target_quadrant is None:
+            # Get quadrant attractiveness values from model
+            quadrant_attractiveness = getattr(self.model, 'human_quadrant_attractiveness', {
+                'tech_business': 0.15,
+                'politics_news': 0.20,
+                'hobbies': 0.34,
+                'pop_culture': 0.50
+            })
 
-        # Choose target quadrant based on weights
-        target_quadrant = self.model.random.choices(
-            list(movement_weights.keys()),
-            weights=list(movement_weights.values()),
-            k=1
-        )[0]
+            # Calculate movement weights based on preferences and attractiveness
+            movement_weights = {}
+            for quadrant in self.quadrant_preferences:
+                movement_weights[quadrant] = (0.7 * self.quadrant_preferences[quadrant] +
+                                              0.3 * quadrant_attractiveness[quadrant])
 
-        # Set target coordinates based on chosen quadrant
-        target_x, target_y = 0.25, 0.25  # Default to Q1 center
+            # Normalize weights
+            weight_sum = sum(movement_weights.values())
+            for key in movement_weights:
+                movement_weights[key] /= weight_sum
 
-        if target_quadrant == 'tech_business':
-            target_x, target_y = 0.25, 0.25  # Q1 center
-        elif target_quadrant == 'politics_news':
-            target_x, target_y = 0.25, 0.75  # Q2 center
-        elif target_quadrant == 'hobbies':
-            target_x, target_y = 0.75, 0.25  # Q3 center
-        elif target_quadrant == 'pop_culture':
-            target_x, target_y = 0.75, 0.75  # Q4 center
+            # Choose target quadrant based on weights
+            self.current_target_quadrant = self.model.random.choices(
+                list(movement_weights.keys()),
+                weights=list(movement_weights.values()),
+                k=1
+            )[0]
 
-        # Add randomness to target
-        target_x += self.model.random.uniform(-0.15, 0.15)
-        target_y += self.model.random.uniform(-0.15, 0.15)
+            # Set target coordinates based on chosen quadrant
+            if self.current_target_quadrant == 'tech_business':
+                self.target_x, self.target_y = 0.25, 0.25  # Q1 center
+            elif self.current_target_quadrant == 'politics_news':
+                self.target_x, self.target_y = 0.25, 0.75  # Q2 center
+            elif self.current_target_quadrant == 'hobbies':
+                self.target_x, self.target_y = 0.75, 0.25  # Q3 center
+            elif self.current_target_quadrant == 'pop_culture':
+                self.target_x, self.target_y = 0.75, 0.75  # Q4 center
 
-        # Ensure values stay within [0,1]
-        target_x = max(0, min(1, target_x))
-        target_y = max(0, min(1, target_y))
+            # Add randomness to target
+            self.target_x += self.model.random.uniform(-0.15, 0.15)
+            self.target_y += self.model.random.uniform(-0.15, 0.15)
+
+            # Ensure values stay within [0,1]
+            self.target_x = max(0, min(1, self.target_x))
+            self.target_y = max(0, min(1, self.target_y))
+
+            # Set commitment period (5-15 steps)
+            self.target_commitment = self.model.random.randint(5, 15)
+
+            # Super users have longer commitment periods
+            if hasattr(self, 'is_super_user') and self.is_super_user:
+                self.target_commitment *= 2
+
+        # Decrement commitment counter
+        self.target_commitment -= 1
 
         # Move toward target (gradual movement)
-        movement_speed = 0.1  # How fast to move toward target
-        self.topic_position['x'] += movement_speed * (target_x - self.topic_position['x'])
-        self.topic_position['y'] += movement_speed * (target_y - self.topic_position['y'])
+        movement_speed = getattr(self, 'topic_mobility', 0.1)
+        self.topic_position['x'] += movement_speed * (self.target_x - self.topic_position['x'])
+        self.topic_position['y'] += movement_speed * (self.target_y - self.topic_position['y'])
 
     def react_to_posts(self):
         """React to posts from connected or nearby agents."""
@@ -255,6 +282,13 @@ class HumanAgent(SocialMediaAgent):
 
     def update_connection_probability(self, other_agent, satisfaction_change):
         """Update probability of maintaining connection based on interaction."""
+        if other_agent.agent_type == "human" and getattr(other_agent, "is_super_user", False):
+            # Higher chance to maintain connections with super users despite negative interactions
+            if satisfaction_change < -0.2:  # Significant negative interaction
+                if other_agent.unique_id in self.connections:
+                    # Reduced chance to break connection (3% vs 5%)
+                    if self.model.random.random() < 0.03:
+                        self.remove_connection(other_agent)
         # For human-to-human
         if other_agent.agent_type == "human":
             if satisfaction_change < -0.2:  # Significant negative interaction
