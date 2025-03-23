@@ -1,6 +1,6 @@
 """
 model.py - Implementation of a social media simulation model with quadrant-based topic space
-using Mesa 3.1.4
+using Mesa 3.1.4 with proximity-based connections
 """
 
 import mesa
@@ -31,7 +31,6 @@ class QuadrantTopicModel(mesa.Model):
             bot_ban_rate_multiplier=constants.DEFAULT_BOT_BAN_RATE_MULTIPLIER,
 
             # Network parameters
-            connection_rewiring_prob=constants.DEFAULT_CONNECTION_REWIRING_PROB,
             network_stability=constants.DEFAULT_NETWORK_STABILITY,
 
             # Topic parameters
@@ -57,7 +56,6 @@ class QuadrantTopicModel(mesa.Model):
         self.human_creation_rate = human_creation_rate
         self.bot_creation_rate = bot_creation_rate
         self.bot_ban_rate_multiplier = bot_ban_rate_multiplier
-        self.connection_rewiring_prob = connection_rewiring_prob
         self.network_stability = network_stability
         self.topic_shift_frequency = topic_shift_frequency
 
@@ -79,11 +77,11 @@ class QuadrantTopicModel(mesa.Model):
         # Initialize the topic space using cell space
         self.initialize_topic_space()
 
-        # Create network for agent connections
-        self.create_network()
-
         # Create initial agents
         self.create_initial_agents()
+
+        # Create initial connections based on proximity
+        self.create_initial_connections()
 
         # Initialize data collector
         self.initialize_data_collector()
@@ -178,20 +176,6 @@ class QuadrantTopicModel(mesa.Model):
 
         return agents
 
-    def create_network(self):
-        """Create a small world network for agent connections."""
-        # Get current count of active agents for network size
-        n = max(5, len(self.agents))  # Use current agent count, ensure at least 5 nodes
-        k = min(4, n - 1)  # Each node connected to k nearest neighbors
-
-        # Use the model's random number generator for reproducibility
-        self.network = nx.watts_strogatz_graph(
-            n,
-            k,
-            self.connection_rewiring_prob,
-            seed=self.random.randint(0, 2 ** 32 - 1)
-        )
-
     def create_initial_agents(self):
         """Create initial human and bot agents."""
         # Create humans
@@ -210,86 +194,30 @@ class QuadrantTopicModel(mesa.Model):
             # Place agent in topic space based on its position
             self.place_agent_in_topic_space(agent)
 
-        # Create initial connections based on network topology
-        self.update_agent_connections()
-
-    def update_agent_connections(self):
-        """Update agent connections based on current network topology."""
-        # Reset all connections
-        for agent in self.agents:
-            agent.connections = set()
-
+    def create_initial_connections(self):
+        """Create initial connections based on topic proximity."""
         # Get active agents
         active_agents = [agent for agent in self.agents if agent.active]
 
-        # Create connections based on network edges
-        for edge in self.network.edges():
-            source_idx, target_idx = edge
+        # For each agent, connect to some agents that are close in topic space
+        for agent in active_agents:
+            # Get nearby agents with a relatively high threshold to ensure some initial connections
+            nearby_agents = self.get_nearby_agents(agent, threshold=0.4)
 
-            # Skip if indices are out of range
-            if source_idx >= len(active_agents) or target_idx >= len(active_agents):
-                continue
+            # Filter out self
+            nearby_agents = [other for other in nearby_agents if other.unique_id != agent.unique_id]
 
-            # Get the agents using their indices in the active_agents list
-            source_agent = active_agents[source_idx]
-            target_agent = active_agents[target_idx]
+            # Only connect to a limited number of nearby agents
+            max_connections = 5  # Start with a reasonable number of connections
 
-            # Add connection between the agents
-            if source_agent and target_agent:
-                source_agent.add_connection(target_agent)
+            if nearby_agents:
+                # Select a random subset if there are many nearby agents
+                num_to_connect = min(max_connections, len(nearby_agents))
+                to_connect = self.random.sample(nearby_agents, num_to_connect)
 
-        # Add extra bot-human connections (preferential to super-users)
-        bots = [agent for agent in active_agents if agent.agent_type == "bot"]
-        humans = [agent for agent in active_agents if agent.agent_type == "human"]
-
-        # Prioritize connections to super-users
-        super_users = [h for h in humans if hasattr(h, 'is_super_user') and h.is_super_user]
-        regular_users = [h for h in humans if not (hasattr(h, 'is_super_user') and h.is_super_user)]
-
-        # Sort humans by connection count and super-user status
-        sorted_humans = sorted(super_users, key=lambda h: len(h.connections)) + \
-                        sorted(regular_users, key=lambda h: len(h.connections))
-
-        for bot in bots:
-            # Target up to 5 humans with priority to super-users
-            target_count = min(5, len(sorted_humans))
-            for i in range(target_count):
-                if i < len(sorted_humans) and self.random.random() < 0.4:  # 40% chance per human
-                    bot.add_connection(sorted_humans[i])
-
-    def rewire_network(self):
-        """Rewire the network connections but preserve some existing connections."""
-        # Get active agents
-        active_agents = [agent for agent in self.agents if agent.active]
-        n = len(active_agents)
-
-        if n <= 4:  # Need at least 5 nodes for our approach
-            return
-
-        # Store existing connections before rewiring
-        existing_connections = {}
-        for i, agent in enumerate(active_agents):
-            existing_connections[i] = [
-                active_agents.index(self.get_agent_by_id(conn_id))
-                for conn_id in agent.connections
-                if self.get_agent_by_id(conn_id) in active_agents
-            ]
-
-        # Create a new small world network
-        k = min(4, n - 1)
-        self.network = nx.watts_strogatz_graph(
-            n, k, self.connection_rewiring_prob,
-            seed=self.random.randint(0, 2 ** 32 - 1)
-        )
-
-        # Add some of the previous connections back (based on network_stability)
-        for i, connections in existing_connections.items():
-            for j in connections:
-                if i < n and j < n and self.random.random() < self.network_stability:
-                    self.network.add_edge(i, j)
-
-        # Update agent connections
-        self.update_agent_connections()
+                # Create connections
+                for other in to_connect:
+                    agent.add_connection(other)
 
     def get_agent_by_id(self, agent_id):
         """Retrieve an agent by their unique ID from the model's agents collection."""
@@ -345,17 +273,19 @@ class QuadrantTopicModel(mesa.Model):
 
         # Create new humans - Use np_random for Poisson distribution
         num_new_humans = self.np_random.poisson(self.human_creation_rate)
+        new_humans = []
         for _ in range(num_new_humans):
             agent = HumanAgent(model=self)
             self.active_humans += 1
 
             # Place agent in topic space
             self.place_agent_in_topic_space(agent)
-
+            new_humans.append(agent)
             agents_added = True
 
         # Create new bots - Use np_random for Poisson distribution
         num_new_bots = self.np_random.poisson(self.bot_creation_rate)
+        new_bots = []
         for _ in range(num_new_bots):
             agent = BotAgent(model=self)
 
@@ -367,13 +297,26 @@ class QuadrantTopicModel(mesa.Model):
 
             # Place agent in topic space
             self.place_agent_in_topic_space(agent)
-
+            new_bots.append(agent)
             agents_added = True
 
-        # If we added any agents, recreate the network
+        # Connect new agents to existing agents based on proximity
         if agents_added:
-            self.create_network()
-            self.update_agent_connections()
+            new_agents = new_humans + new_bots
+            for agent in new_agents:
+                # Find nearby agents to connect with
+                nearby_agents = self.get_nearby_agents(agent, threshold=0.3)
+
+                # Filter out other new agents to focus on connecting with established agents
+                established_nearby = [a for a in nearby_agents if a.unique_id != agent.unique_id]
+
+                # Connect to a limited number of nearby established agents
+                if established_nearby:
+                    num_to_connect = min(3, len(established_nearby))
+                    to_connect = self.random.sample(established_nearby, num_to_connect)
+
+                    for other in to_connect:
+                        agent.add_connection(other)
 
     def update_agent_positions(self):
         """Update agent positions in the topic space based on their topic_position."""
@@ -381,6 +324,65 @@ class QuadrantTopicModel(mesa.Model):
             if agent.active:
                 # Move agent to new position in grid
                 self.move_agent_in_topic_space(agent)
+
+    def update_connections_based_on_proximity(self):
+        """Update connections based on topic proximity - replace the rewire_network method."""
+        # Get active agents
+        active_agents = [agent for agent in self.agents if agent.active]
+
+        # Process only a subset of agents each step to prevent excessive computations
+        agents_to_process = self.random.sample(
+            active_agents,
+            min(20, len(active_agents))  # Process at most 20 agents per step
+        )
+
+        for agent in agents_to_process:
+            # FORM NEW CONNECTIONS based on proximity
+            # Get nearby agents that aren't already connected
+            nearby_agents = self.get_nearby_agents(agent, threshold=0.3)
+            unconnected_nearby = [
+                other for other in nearby_agents
+                if other.unique_id != agent.unique_id and other.unique_id not in agent.connections
+            ]
+
+            # Connect to nearby agents with probability based on similarity
+            for other in unconnected_nearby:
+                # Calculate similarity
+                similarity = self.calculate_topic_similarity(agent, other)
+
+                # Higher similarity = higher chance to connect
+                # Base probability (10%) multiplied by similarity (0-1)
+                connect_prob = 0.1 * similarity
+
+                # Adjust for super-users if applicable
+                if agent.agent_type == "human" and hasattr(agent, 'is_super_user') and agent.is_super_user:
+                    connect_prob *= 1.5
+                if other.agent_type == "human" and hasattr(other, 'is_super_user') and other.is_super_user:
+                    connect_prob *= 1.5
+
+                # Form connection with calculated probability
+                if self.random.random() < connect_prob:
+                    agent.add_connection(other)
+
+            # BREAK CONNECTIONS based on distance
+            connections_to_check = list(agent.connections)
+            for connection_id in connections_to_check:
+                other = self.get_agent_by_id(connection_id)
+                if other and other.active:
+                    # Calculate similarity (inverse of distance)
+                    similarity = self.calculate_topic_similarity(agent, other)
+
+                    # Lower similarity = higher chance to break
+                    # Base probability (2%) increased as similarity decreases
+                    break_prob = 0.02 * (1 - similarity) * 2  # Scale up for more noticeable effect
+
+                    # Super-users are less likely to lose connections
+                    if agent.agent_type == "human" and hasattr(agent, 'is_super_user') and agent.is_super_user:
+                        break_prob *= 0.7
+
+                    # Break connection with calculated probability
+                    if self.random.random() < break_prob:
+                        agent.remove_connection(other)
 
     def update_agent_counts(self):
         """Update counters for active and deactivated agents."""
@@ -538,12 +540,11 @@ class QuadrantTopicModel(mesa.Model):
         # Create new agents
         self.create_new_agents()
 
+        # Update connections based on topic proximity
+        self.update_connections_based_on_proximity()
+
         # Form echo chamber connections based on topic proximity
         self.form_echo_chamber_connections()
-
-        # Periodically rewire the network to simulate changing trends
-        if self.steps % self.topic_shift_frequency == 0:
-            self.rewire_network()
 
         # Apply natural connection decay
         self.decay_connections()

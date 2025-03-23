@@ -516,7 +516,7 @@ def run_parameter_experiment(param_name, param_values, steps=50):
 
 if __name__ == "__main__":
     # Run a single simulation with comprehensive data collection
-    model = run_simulation(steps=50, seed=42)
+    model = run_simulation(steps=50, seed=1)
 
     # Uncomment to run parameter experiments
     # run_parameter_experiment('bot_ban_rate_multiplier', [0.1, 0.5, 1.0, 1.5, 2.0], steps=50)
