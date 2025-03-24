@@ -74,6 +74,8 @@ class QuadrantTopicModel(mesa.Model):
         self.deactivated_humans = 0
         self.deactivated_bots = 0
 
+        self.bot_type_by_quadrant = constants.DEFAULT_BOT_TYPE_BY_QUADRANT
+
         # Initialize the topic space using cell space
         self.initialize_topic_space()
 
@@ -229,7 +231,8 @@ class QuadrantTopicModel(mesa.Model):
         # Create bots according to distribution
         for quadrant, count in bots_per_quadrant.items():
             for i in range(count):
-                agent = BotAgent(model=self)
+                # Pass the quadrant to BotAgent constructor for quadrant-specific type distribution
+                agent = BotAgent(model=self, quadrant=quadrant)
                 self.active_bots += 1
 
                 # Set topic position based on quadrant

@@ -21,7 +21,7 @@ DEFAULT_TOPIC_SHIFT_FREQUENCY = 5
 # Interaction parameters
 DEFAULT_HUMAN_HUMAN_POSITIVE_BIAS = 0.7
 DEFAULT_HUMAN_BOT_NEGATIVE_BIAS = 0.8
-DEFAULT_HUMAN_SATISFACTION_INIT = 100
+DEFAULT_HUMAN_SATISFACTION_INIT = 80
 
 # Connection parameters
 DEFAULT_CONNECTION_FORMATION_CHANCE = 0.1
@@ -44,13 +44,36 @@ DEFAULT_BOT_QUADRANT_ATTRACTIVENESS = {
     'pop_culture': 0.19     # Q4: Casual & Societal
 }
 
-# Bot type distribution
+# Bot type distribution (overall defaults)
 DEFAULT_BOT_TYPE_WEIGHTS = {
     'spam': 0.5,            # 50% of bots
     'misinformation': 0.25, # 25% of bots
     'astroturfing': 0.25    # 25% of bots
 }
 
+# Quadrant-specific bot type distributions
+DEFAULT_BOT_TYPE_BY_QUADRANT = {
+    'tech_business': {
+        'spam': 0.3,            # 30%
+        'misinformation': 0.2,  # 20%
+        'astroturfing': 0.5     # 50% - higher in tech/business
+    },
+    'politics_news': {
+        'spam': 0.2,            # 20%
+        'misinformation': 0.6,  # 60% - higher in politics/news
+        'astroturfing': 0.2     # 20%
+    },
+    'hobbies': {
+        'spam': 0.7,            # 70% - higher in hobbies
+        'misinformation': 0.2,  # 20%
+        'astroturfing': 0.1     # 10%
+    },
+    'pop_culture': {
+        'spam': 0.6,            # 60% - higher in pop culture
+        'misinformation': 0.3,  # 30%
+        'astroturfing': 0.1     # 10%
+    }
+}
 # Super user parameters
 DEFAULT_SUPER_USER_PROBABILITY = 0.1  # 10% of human users are super users
 DEFAULT_SUPER_USER_ACTIVITY_MULTIPLIER = 4.0  # Super users are 4x more active

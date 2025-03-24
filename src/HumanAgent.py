@@ -135,8 +135,7 @@ class HumanAgent(SocialMediaAgent):
             # Calculate movement weights based on preferences and attractiveness
             movement_weights = {}
             for quadrant in self.quadrant_preferences:
-                movement_weights[quadrant] = (0.7 * self.quadrant_preferences[quadrant] +
-                                              0.3 * quadrant_attractiveness[quadrant])
+                movement_weights[quadrant] = (self.quadrant_preferences[quadrant])
 
             # Normalize weights
             weight_sum = sum(movement_weights.values())

@@ -11,10 +11,21 @@ from datetime import date, timedelta
 class BotAgent(SocialMediaAgent):
     """Bot agent in the social media simulation with 2D topic space."""
 
-    def __init__(self, model):
-        # Use weighted choice to determine bot type
+    def __init__(self, model, quadrant=None):
+        # Use quadrant to determine bot type if available
         bot_types = ["spam", "misinformation", "astroturfing"]
+
+        # Default weights if no quadrant or no quadrant-specific weights
         bot_weights = [0.5, 0.25, 0.25]  # 10:5:5 ratio
+
+        # If a quadrant is specified and the model has quadrant-specific bot type weights
+        if quadrant and hasattr(model, 'bot_type_by_quadrant'):
+            # Get quadrant-specific bot type weights
+            quadrant_weights = model.bot_type_by_quadrant.get(quadrant, {})
+            if quadrant_weights:
+                # Update bot types and weights based on quadrant-specific distribution
+                bot_types = list(quadrant_weights.keys())
+                bot_weights = list(quadrant_weights.values())
 
         # Use model's RNG for reproducibility with weighted choice
         self.bot_type = model.random.choices(
