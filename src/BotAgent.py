@@ -7,6 +7,8 @@ from SocialMediaAgent import SocialMediaAgent
 import numpy as np
 from datetime import date, timedelta
 
+from src import constants
+
 
 class BotAgent(SocialMediaAgent):
     """Bot agent in the social media simulation with 2D topic space."""
@@ -40,14 +42,13 @@ class BotAgent(SocialMediaAgent):
 
         # Bot characteristics
         self.detection_rate = 0
-        self.malicious_post_rate = model.random.uniform(0.05, 0.9)
-
+        self.malicious_post_rate = model.random.uniform(*constants.DEFAULT_BOT_MALICIOUS_POST_RATE_RANGE)
         # Position in 2D topic grid instead of 5D vector
         # Initialize based on bot type and quadrant attractiveness
         self.initialize_topic_position(model)
 
         # Low topic mobility for bots (they tend to stay in their preferred topics)
-        self.topic_mobility = model.random.uniform(0.02, 0.1)
+        self.topic_mobility = model.random.uniform(*constants.DEFAULT_BOT_TOPIC_MOBILITY_RANGE)
 
         # Configure bot behaviors based on type
         self.configure_bot_type()
@@ -63,33 +64,14 @@ class BotAgent(SocialMediaAgent):
         })
 
         # Adjust attractiveness based on bot type
-        type_quadrant_bias = {
-            'spam': {
-                'tech_business': 0.2,
-                'politics_news': 0.2,
-                'pop_culture': 0.5,
-                'hobbies': 0.1
-            },
-            'misinformation': {
-                'tech_business': 0.3,
-                'politics_news': 0.6,
-                'pop_culture': 0.05,
-                'hobbies': 0.05
-            },
-            'astroturfing': {
-                'tech_business': 0.7,
-                'politics_news': 0.2,
-                'pop_culture': 0.05,
-                'hobbies': 0.05
-            }
-        }
+        type_quadrant_bias = constants.DEFAULT_BOT_TYPE_QUADRANT_BIAS
 
         # Calculate combined weights
         combined_weights = {}
         for quadrant in quadrant_attractiveness:
             combined_weights[quadrant] = (
-                0.7 * quadrant_attractiveness[quadrant] +
-                0.3 * type_quadrant_bias[self.bot_type][quadrant]
+                    constants.DEFAULT_QUADRANT_ATTRACTIVENESS_WEIGHT * quadrant_attractiveness[quadrant] +
+                    constants.DEFAULT_TYPE_QUADRANT_BIAS_WEIGHT * type_quadrant_bias[self.bot_type][quadrant]
             )
 
         # Normalize weights

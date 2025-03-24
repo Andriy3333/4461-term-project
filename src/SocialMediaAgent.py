@@ -6,6 +6,9 @@ using Mesa 3.1.4
 import mesa
 from datetime import date, timedelta
 
+from src import constants
+
+
 class SocialMediaAgent(mesa.Agent):
     """Base class for all agents in the social media simulation."""
 
@@ -13,7 +16,7 @@ class SocialMediaAgent(mesa.Agent):
         # In Mesa 3.1.4, Agent.__init__ only requires model
         super().__init__(model=model)
 
-        self.creation_date = date(2022, 1, 1) + timedelta(model.steps)
+        self.creation_date = constants.DEFAULT_SIMULATION_START_DATE + timedelta(model.steps)
         self.deactivation_date = None
         self.active = True
         self.connections = set()  # Set of connected agent unique_ids
@@ -59,16 +62,16 @@ class SocialMediaAgent(mesa.Agent):
     def add_connection(self, other_agent):
         """Add a connection to another agent."""
         # Add a connection limit (e.g., 20 for humans, 50 for bots)
-        connection_limit = 20 if self.agent_type == "human" else 50
+        connection_limit = (constants.DEFAULT_HUMAN_CONNECTION_LIMIT if self.agent_type == "human"
+                            else constants.DEFAULT_BOT_CONNECTION_LIMIT)
 
         # Only add if under the limit
         if len(self.connections) < connection_limit:
             self.connections.add(other_agent.unique_id)
 
             # Only add the reverse connection if the other agent is also under their limit
-            other_limit = 20 if other_agent.agent_type == "human" else 50
-            if len(other_agent.connections) < other_limit:
-                other_agent.connections.add(self.unique_id)
+            other_limit = (constants.DEFAULT_HUMAN_CONNECTION_LIMIT if other_agent.agent_type == "human"
+                           else constants.DEFAULT_BOT_CONNECTION_LIMIT)
 
     def remove_connection(self, other_agent):
         """Remove a connection to another agent."""

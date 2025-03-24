@@ -108,7 +108,7 @@ class QuadrantTopicModel(mesa.Model):
         self.topic_grid = {}
 
         # Define grid resolution (100x100)
-        self.grid_resolution = 100
+        self.grid_resolution = constants.DEFAULT_GRID_RESOLUTION
 
         # Define the quadrants for quick reference
         self.quadrants = {
@@ -478,7 +478,7 @@ class QuadrantTopicModel(mesa.Model):
         # Process only a subset of agents each step to prevent excessive computations
         agents_to_process = self.random.sample(
             active_agents,
-            min(20, len(active_agents))  # Process at most 20 agents per step
+            min(constants.DEFAULT_AGENTS_TO_PROCESS_PER_STEP, len(active_agents))
         )
 
         for agent in agents_to_process:
@@ -497,7 +497,7 @@ class QuadrantTopicModel(mesa.Model):
 
                 # Higher similarity = higher chance to connect
                 # Base probability (10%) multiplied by similarity (0-1)
-                connect_prob = 0.1 * similarity
+                connect_prob = constants.DEFAULT_PROXIMITY_CONNECTION_PROBABILITY * similarity
 
                 # Adjust for super-users if applicable
                 if agent.agent_type == "human" and hasattr(agent, 'is_super_user') and agent.is_super_user:
@@ -519,7 +519,7 @@ class QuadrantTopicModel(mesa.Model):
 
                     # Lower similarity = higher chance to break
                     # Base probability (2%) increased as similarity decreases
-                    break_prob = 0.02 * (1 - similarity) * 2  # Scale up for more noticeable effect
+                    break_prob = constants.DEFAULT_CONNECTION_BREAKING_BASE_PROB * (1 - similarity) * 2
 
                     # Super-users are less likely to lose connections
                     if agent.agent_type == "human" and hasattr(agent, 'is_super_user') and agent.is_super_user:
@@ -626,7 +626,7 @@ class QuadrantTopicModel(mesa.Model):
             connections_to_remove = []
             for connection_id in agent.connections:
                 # 0.5% chance to decay each connection per step
-                if self.random.random() < 0.005:
+                if self.random.random() < constants.DEFAULT_CONNECTION_DECAY_PROB:
                     connections_to_remove.append(connection_id)
 
             # Remove the selected connections

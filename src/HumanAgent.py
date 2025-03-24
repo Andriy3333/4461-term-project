@@ -2,7 +2,7 @@
 HumanAgent.py - Implementation of human agents for social media simulation
 using Mesa 3.1.4 with 2D topic grid
 """
-
+import constants
 from SocialMediaAgent import SocialMediaAgent
 import numpy as np
 from datetime import date, timedelta
@@ -17,31 +17,33 @@ class HumanAgent(SocialMediaAgent):
         self.agent_type = "human"
 
         # Determine if this is a super-user (10% chance)
-        self.is_super_user = model.random.random() < 0.1
+        self.is_super_user = model.random.random() < constants.DEFAULT_SUPER_USER_PROBABILITY
 
-        # NEW: Super users get special movement properties
+        # Super users get special movement properties
         if self.is_super_user:
-            self.topic_mobility = model.random.uniform(0.01, 0.03)  # Very small movement (10-30% of regular users)
-            self.influence_radius = model.random.uniform(0.2, 0.3)  # Radius of influence
-            self.topic_leadership = model.random.uniform(0.5, 0.8)  # How strongly they pull others
+            self.topic_mobility = model.random.uniform(*constants.DEFAULT_SUPER_USER_TOPIC_MOBILITY_RANGE)
+            self.influence_radius = model.random.uniform(*constants.DEFAULT_SUPER_USER_INFLUENCE_RADIUS_RANGE)
+            self.topic_leadership = model.random.uniform(*constants.DEFAULT_SUPER_USER_TOPIC_LEADERSHIP_RANGE)
         else:
-            self.topic_mobility = model.random.uniform(0.08, 0.12)  # Regular mobility
+            self.topic_mobility = model.random.uniform(*constants.DEFAULT_REGULAR_USER_TOPIC_MOBILITY_RANGE)
             self.influence_radius = 0
             self.topic_leadership = 0
 
         # Get satisfaction from model if available, otherwise use default 100
         self.satisfaction = getattr(model, "human_satisfaction_init", 100)
 
-        # Super-users are more resistant to leaving (higher satisfaction threshold)
-        self.satisfaction_threshold = 0 if not self.is_super_user else -20
+        # Super-users are more resistant to leaving
+        self.satisfaction_threshold = (constants.DEFAULT_REGULAR_USER_SATISFACTION_THRESHOLD if not self.is_super_user
+                                       else constants.DEFAULT_SUPER_USER_SATISFACTION_THRESHOLD)
 
-        # Personality parameters that affect interactions - use model's RNG
-        self.irritability = model.random.uniform(0.5, 2)  # More irritable users lose satisfaction quicker
-        self.authenticity = model.random.uniform(0.5, 2)  # Higher number indicates distaste for misinformation
+        # Personality parameters
+        self.irritability = model.random.uniform(*constants.DEFAULT_HUMAN_IRRITABILITY_RANGE)
+        self.authenticity = model.random.uniform(*constants.DEFAULT_HUMAN_AUTHENTICITY_RANGE)
 
-        # Super-users are 4x more active
-        self.base_activeness = model.random.uniform(0.2, 0.6)
-        self.activeness = self.base_activeness * 4 if self.is_super_user else self.base_activeness
+        # Activity parameters
+        self.base_activeness = model.random.uniform(*constants.DEFAULT_HUMAN_BASE_ACTIVENESS_RANGE)
+        self.activeness = (self.base_activeness * constants.DEFAULT_SUPER_USER_ACTIVITY_MULTIPLIER
+                           if self.is_super_user else self.base_activeness)
 
         # Position in 2D topic grid instead of 5D vector
         # x-axis: 0 (Serious) to 1 (Casual)
@@ -66,10 +68,11 @@ class HumanAgent(SocialMediaAgent):
         for key in self.quadrant_preferences:
             self.quadrant_preferences[key] /= pref_sum
 
-        # Base post frequency adjusted for super-users
-        self.base_post_frequency = model.random.uniform(0.1, 0.4)
-        self.post_frequency = self.base_post_frequency * 4 if self.is_super_user else self.base_post_frequency
-        self.popularity = model.random.uniform(0.3, 0.95)
+        # Post frequency
+        self.base_post_frequency = model.random.uniform(*constants.DEFAULT_HUMAN_BASE_POST_FREQUENCY_RANGE)
+        self.post_frequency = (self.base_post_frequency * constants.DEFAULT_SUPER_USER_ACTIVITY_MULTIPLIER
+                               if self.is_super_user else self.base_post_frequency)
+        self.popularity = model.random.uniform(*constants.DEFAULT_HUMAN_POPULARITY_RANGE)
 
     def step(self):
         """Human agent behavior during each step."""
@@ -283,14 +286,14 @@ class HumanAgent(SocialMediaAgent):
         """Update probability of maintaining connection based on interaction."""
         if other_agent.agent_type == "human" and getattr(other_agent, "is_super_user", False):
             # Higher chance to maintain connections with super users despite negative interactions
-            if satisfaction_change < -0.2:  # Significant negative interaction
+            if satisfaction_change < constants.DEFAULT_BOT_BLOCK_SATISFACTION_THRESHOLD: # Significant negative interaction
                 if other_agent.unique_id in self.connections:
                     # Reduced chance to break connection (3% vs 5%)
-                    if self.model.random.random() < 0.03:
+                    if self.model.random.random() < constants.DEFAULT_SUPER_USER_CONNECTION_BREAKING_PROB:
                         self.remove_connection(other_agent)
         # For human-to-human
         if other_agent.agent_type == "human":
-            if satisfaction_change < -0.2:  # Significant negative interaction
+            if satisfaction_change < constants.DEFAULT_BOT_BLOCK_SATISFACTION_THRESHOLD:  # Significant negative interaction
                 if other_agent.unique_id in self.connections:
                     # Chance to break connection after negative interaction
                     if self.model.random.random() < 0.05:  # Small chance (5%)

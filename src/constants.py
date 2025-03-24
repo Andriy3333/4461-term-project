@@ -85,3 +85,65 @@ DEFAULT_BOT_TOPIC_MOBILITY = 0.05
 # Echo chamber parameters
 DEFAULT_ECHO_CHAMBER_STRENGTH = 0.2  # Probability of processing a human for echo chamber formation per step
 DEFAULT_PROXIMITY_CONNECTION_PROBABILITY = 0.1  # Base probability for forming connections with nearby agents
+
+# Grid parameters
+DEFAULT_GRID_RESOLUTION = 100  # Grid resolution for topic space
+
+# Agent processing parameters
+DEFAULT_AGENTS_TO_PROCESS_PER_STEP = 20  # Maximum agents to process per step
+
+# Connection parameters (additional)
+DEFAULT_CONNECTION_BREAKING_BASE_PROB = 0.02  # Base probability for breaking connections
+DEFAULT_CONNECTION_DECAY_PROB = 0.005  # Probability for random connection decay
+DEFAULT_SUPER_USER_CONNECTION_BREAKING_PROB = 0.03  # Probability for super users to break connections
+DEFAULT_BOT_BLOCK_SATISFACTION_THRESHOLD = -0.15  # Satisfaction threshold for blocking bots
+
+# Human parameters
+DEFAULT_REGULAR_USER_SATISFACTION_THRESHOLD = 0  # Satisfaction threshold for regular users
+DEFAULT_SUPER_USER_SATISFACTION_THRESHOLD = -20  # Satisfaction threshold for super users
+DEFAULT_HUMAN_IRRITABILITY_RANGE = (0.5, 2)  # Range for human irritability
+DEFAULT_HUMAN_AUTHENTICITY_RANGE = (0.5, 2)  # Range for human authenticity
+DEFAULT_HUMAN_BASE_ACTIVENESS_RANGE = (0.2, 0.6)  # Range for human base activeness
+DEFAULT_HUMAN_BASE_POST_FREQUENCY_RANGE = (0.1, 0.4)  # Range for human base post frequency
+DEFAULT_HUMAN_POPULARITY_RANGE = (0.3, 0.95)  # Range for human popularity
+
+# Super user parameters (additional)
+DEFAULT_SUPER_USER_TOPIC_MOBILITY_RANGE = (0.01, 0.03)  # Range for super user topic mobility
+DEFAULT_SUPER_USER_INFLUENCE_RADIUS_RANGE = (0.2, 0.3)  # Range for super user influence radius
+DEFAULT_SUPER_USER_TOPIC_LEADERSHIP_RANGE = (0.5, 0.8)  # Range for super user topic leadership
+DEFAULT_REGULAR_USER_TOPIC_MOBILITY_RANGE = (0.08, 0.12)  # Range for regular user topic mobility
+
+# Bot parameters
+DEFAULT_BOT_TOPIC_MOBILITY_RANGE = (0.02, 0.1)  # Range for bot topic mobility
+DEFAULT_BOT_MALICIOUS_POST_RATE_RANGE = (0.05, 0.9)  # Range for bot malicious post rate
+
+# Bot type quadrant bias
+DEFAULT_BOT_TYPE_QUADRANT_BIAS = {
+    'spam': {
+        'tech_business': 0.2,
+        'politics_news': 0.2,
+        'pop_culture': 0.5,
+        'hobbies': 0.1
+    },
+    'misinformation': {
+        'tech_business': 0.3,
+        'politics_news': 0.6,
+        'pop_culture': 0.05,
+        'hobbies': 0.05
+    },
+    'astroturfing': {
+        'tech_business': 0.7,
+        'politics_news': 0.2,
+        'pop_culture': 0.05,
+        'hobbies': 0.05
+    }
+}
+
+# Quadrant attractiveness weights
+DEFAULT_QUADRANT_ATTRACTIVENESS_WEIGHT = 0.7  # Weight for quadrant attractiveness
+DEFAULT_TYPE_QUADRANT_BIAS_WEIGHT = 0.3  # Weight for type quadrant bias
+
+# General parameters
+DEFAULT_SIMULATION_START_DATE = date(2022, 1, 1)  # Start date for simulation
+DEFAULT_HUMAN_CONNECTION_LIMIT = 20  # Connection limit for humans
+DEFAULT_BOT_CONNECTION_LIMIT = 50  # Connection limit for bots
