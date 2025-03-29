@@ -186,7 +186,11 @@ class HumanAgent(SocialMediaAgent):
         self.topic_position['y'] += movement_speed * (self.target_y - self.topic_position['y'])
 
     def react_to_posts(self):
-        """React to posts from connected or nearby agents."""
+        """React to posts from connected or nearby agents, with random exposure to bot content."""
+        if not self.active:
+            return
+
+        # PART 1: React to connected agents (existing logic)
         # Get all active connected agents
         connected_agents = []
         for agent_id in self.connections:
@@ -212,6 +216,34 @@ class HumanAgent(SocialMediaAgent):
             # React to each target's post
             for target in interaction_targets:
                 self.react_to_post(target)
+
+        # PART 2: Forced Feed mechanism - random exposure to bot content
+        # Get configured probability or use default
+        forced_feed_probability = constants.DEFAULT_FORCED_FEED_PROBABILITY
+
+        # Check if we should expose this human to random bot content
+        if self.model.random.random() < forced_feed_probability:
+            # Get all active bots that posted today (including those not connected)
+            active_posting_bots = [agent for agent in self.model.agents
+                                   if agent.active and
+                                   agent.agent_type == "bot" and
+                                   getattr(agent, "posted_today", False)]
+
+            # If there are active bots that posted
+            if active_posting_bots:
+                # Determine how many forced posts to show (1-2)
+                num_forced_posts = self.model.random.randint(1, constants.DEFAULT_FORCED_FEED_MAX_POSTS)
+
+                # Select random bots to force-expose
+                forced_bots = self.model.random.sample(
+                    active_posting_bots,
+                    min(num_forced_posts, len(active_posting_bots))
+                )
+
+                # React to each forced bot post
+                for bot in forced_bots:
+                    # Use the same reaction mechanism as for connected posts
+                    self.react_to_post(bot)
 
     def react_to_post(self, other_agent):
         """React to a post from another agent with quadrant factors."""

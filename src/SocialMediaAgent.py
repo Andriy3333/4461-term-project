@@ -6,8 +6,7 @@ using Mesa 3.1.4
 import mesa
 from datetime import date, timedelta
 
-from src import constants
-
+import constants
 
 class SocialMediaAgent(mesa.Agent):
     """Base class for all agents in the social media simulation."""

@@ -1,10 +1,15 @@
 """
 constants.py - Default parameters for social media simulation with 2D topic space
 """
+from datetime import date
 
 # Initial population - targets for 2012
 DEFAULT_INITIAL_HUMANS = 184
 DEFAULT_INITIAL_BOTS = 16
+
+# Forced feed parameters
+DEFAULT_FORCED_FEED_PROBABILITY = 1  # 30% chance of seeing forced bot content
+DEFAULT_FORCED_FEED_MAX_POSTS = 2  # Maximum number of forced posts per step
 
 # Growth rates - calibrated to reach 2025 targets (~480 humans, ~120 bots by step 50)
 DEFAULT_HUMAN_CREATION_RATE = 6.0

@@ -262,14 +262,14 @@ def quadrant_distribution_visualization(model):
 
 
 def satisfaction_visualization(model):
-    """Create histogram and line plot for human satisfaction"""
+    """Create histogram and line plot for human satisfaction with dynamic scaling"""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
 
     if not model:
         ax1.text(0.5, 0.5, "Satisfaction data will appear after model initialization.",
-                ha='center', va='center', fontsize=10)
+                 ha='center', va='center', fontsize=10)
         ax2.text(0.5, 0.5, "Satisfaction data will appear after model initialization.",
-                ha='center', va='center', fontsize=10)
+                 ha='center', va='center', fontsize=10)
         ax1.axis('off')
         ax2.axis('off')
         plt.tight_layout()
@@ -302,20 +302,37 @@ def satisfaction_visualization(model):
         else:
             quadrant_avg_satisfaction[q] = 0
 
-    # Create histogram on left plot
+    # Create histogram on left plot with adaptive binning and scaling
     if satisfaction_values:
-        ax1.hist(satisfaction_values, bins=20, range=(0, 100), alpha=0.7, color='green')
+        # Calculate optimal bin count using Freedman-Diaconis rule
+        # This scales better with large datasets than fixed bin count
+        q75, q25 = np.percentile(satisfaction_values, [75, 25])
+        iqr = q75 - q25
+        bin_width = 2 * iqr / (len(satisfaction_values) ** (1 / 3)) if iqr > 0 else 5
+        bin_count = max(10, min(50, int(np.ceil((100) / bin_width)))) if bin_width > 0 else 20
+
+        # Create histogram with dynamic bins
+        n, bins, patches = ax1.hist(satisfaction_values, bins=bin_count,
+                                    range=(0, 100), alpha=0.7, color='green')
+
         ax1.set_title(f"Human Satisfaction Distribution (Avg: {np.mean(satisfaction_values):.1f})", fontsize=10)
         ax1.set_xlabel("Satisfaction Level", fontsize=9)
         ax1.set_ylabel("Number of Humans", fontsize=9)
         ax1.set_xlim(0, 100)
 
-        # Set a reasonable y-axis limit
-        max_humans = max(len(satisfaction_values) // 10 + 5, 20)
-        ax1.set_ylim(0, max_humans)
+        # Set a dynamic y-axis limit based on the histogram height
+        # Add 10% padding to the top for readability
+        if max(n) > 0:
+            ax1.set_ylim(0, max(n) * 1.1)
+        else:
+            ax1.set_ylim(0, 20)
+
+        # Add grid for easier reading with large datasets
+        ax1.grid(True, axis='y', alpha=0.3, linestyle='--')
+
     else:
         ax1.text(0.5, 0.5, "No active human agents",
-                ha='center', va='center')
+                 ha='center', va='center')
         ax1.set_xlim(0, 100)
         ax1.set_ylim(0, 20)
 
@@ -327,23 +344,31 @@ def satisfaction_visualization(model):
     values = [quadrant_avg_satisfaction.get(q, 0) for q in quadrants]
     bars = ax2.bar(pretty_names, values, color=colors, alpha=0.7)
 
-    # Add data labels
+    # Add data labels with adaptive positioning
     for bar, value in zip(bars, values):
         if value > 0:
-            ax2.text(bar.get_x() + bar.get_width()/2., value + 1,
-                    f'{value:.1f}', ha='center', va='bottom', fontsize=8)
+            # Position labels with smarter vertical offset as values grow
+            label_y_pos = value + max(1, min(5, value * 0.03))
+            ax2.text(bar.get_x() + bar.get_width() / 2., label_y_pos,
+                     f'{value:.1f}', ha='center', va='bottom', fontsize=8)
 
     ax2.set_title("Average Satisfaction by Quadrant", fontsize=10)
     ax2.set_xlabel("Quadrant", fontsize=9)
     ax2.set_ylabel("Average Satisfaction", fontsize=9)
+
+    # Keep y-axis fixed at 0-100 since satisfaction is on that scale
+    # Could be adjusted if values were to exceed 100
     ax2.set_ylim(0, 100)
     ax2.tick_params(axis='x', labelrotation=30, labelsize=8)
+
+    # Add grid for readability
+    ax2.grid(True, axis='y', alpha=0.3, linestyle='--')
 
     # Add the overall average line
     if satisfaction_values:
         avg = np.mean(satisfaction_values)
         ax2.axhline(avg, color='red', linestyle='--', alpha=0.5,
-                   label=f'Overall Avg: {avg:.1f}')
+                    label=f'Overall Avg: {avg:.1f}')
         ax2.legend(fontsize=8)
 
     plt.tight_layout()
@@ -795,26 +820,6 @@ def QuadrantDashboard():
                     step=0.1,
                     value=bot_ban_rate_multiplier,
                     on_value=lambda v: update_param(v, set_bot_ban_rate_multiplier)
-                )
-
-                # Interaction parameters
-                solara.Markdown("### Interaction Parameters")
-                solara.SliderFloat(
-                    label="Human-Human Positive Bias",
-                    min=0.0,
-                    max=1.0,
-                    step=0.05,
-                    value=human_human_positive_bias,
-                    on_value=lambda v: update_param(v, set_human_human_positive_bias)
-                )
-
-                solara.SliderFloat(
-                    label="Human-Bot Negative Bias",
-                    min=0.0,
-                    max=1.0,
-                    step=0.05,
-                    value=human_bot_negative_bias,
-                    on_value=lambda v: update_param(v, set_human_bot_negative_bias)
                 )
 
                 # Network parameters (shortened section)

@@ -7,8 +7,7 @@ from SocialMediaAgent import SocialMediaAgent
 import numpy as np
 from datetime import date, timedelta
 
-from src import constants
-
+import constants
 
 class BotAgent(SocialMediaAgent):
     """Bot agent in the social media simulation with 2D topic space."""
