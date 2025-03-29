@@ -186,63 +186,65 @@ class HumanAgent(SocialMediaAgent):
         self.topic_position['y'] += movement_speed * (self.target_y - self.topic_position['y'])
 
     def react_to_posts(self):
-        """React to posts from connected or nearby agents, with random exposure to bot content."""
+        """React to posts with zero-sum allocation between forced and follower feeds."""
         if not self.active:
             return
 
-        # PART 1: React to connected agents (existing logic)
-        # Get all active connected agents
-        connected_agents = []
+        if self.model.steps < 0:
+            return
+
+        # Get forced feed ratio from constants
+        forced_feed_ratio = constants.DEFAULT_FORCED_FEED_PROBABILITY
+
+        # Determine base number of posts to see (based on user's activeness)
+        base_post_count = max(3, int(10 * self.activeness))
+
+        # Split post count between sources based on ratio
+        forced_feed_count = int(base_post_count * forced_feed_ratio)
+        follower_feed_count = base_post_count - forced_feed_count
+
+        # PART 1: Follower feed content
+        # Get all active connected agents who posted
+        posting_connected_agents = []
         for agent_id in self.connections:
             agent = self.get_agent_by_id(agent_id)
-            if agent and agent.active:
-                connected_agents.append(agent)
+            if agent and agent.active and getattr(agent, "posted_today", False):
+                posting_connected_agents.append(agent)
 
-        # Only consider connected agents for interactions
-        potential_interactions = connected_agents
+        # Process follower feed interactions
+        if posting_connected_agents and follower_feed_count > 0:
+            # Limit to available posts
+            follower_count = min(follower_feed_count, len(posting_connected_agents))
 
-        # Filter out those who didn't post
-        potential_interactions = [a for a in potential_interactions if getattr(a, "posted_today", False)]
-
-        # Randomly select a subset to interact with based on activeness
-        num_interactions = max(1, int(len(potential_interactions) * self.activeness))
-        if potential_interactions and num_interactions > 0:
-            # Use model's random for reproducibility
-            interaction_targets = self.model.random.sample(
-                potential_interactions,
-                min(num_interactions, len(potential_interactions))
+            # Select random posts from connections
+            follower_targets = self.model.random.sample(
+                posting_connected_agents,
+                follower_count
             )
 
-            # React to each target's post
-            for target in interaction_targets:
+            # React to each post
+            for target in follower_targets:
                 self.react_to_post(target)
 
-        # PART 2: Forced Feed mechanism - random exposure to bot content
-        # Get configured probability or use default
-        forced_feed_probability = constants.DEFAULT_FORCED_FEED_PROBABILITY
-
-        # Check if we should expose this human to random bot content
-        if self.model.random.random() < forced_feed_probability:
-            # Get all active bots that posted today (including those not connected)
+        # PART 2: Forced feed content
+        if forced_feed_count > 0:
+            # Get all active bots that posted today (excluding connections)
             active_posting_bots = [agent for agent in self.model.agents
                                    if agent.active and
                                    agent.agent_type == "bot" and
-                                   getattr(agent, "posted_today", False)]
+                                   getattr(agent, "posted_today", False) and
+                                   agent.unique_id not in self.connections]
 
-            # If there are active bots that posted
+            # Process forced feed if bots are available
             if active_posting_bots:
-                # Determine how many forced posts to show (1-2)
-                num_forced_posts = self.model.random.randint(1, constants.DEFAULT_FORCED_FEED_MAX_POSTS)
+                # Limit to available bots
+                bot_count = min(forced_feed_count, len(active_posting_bots))
 
                 # Select random bots to force-expose
-                forced_bots = self.model.random.sample(
-                    active_posting_bots,
-                    min(num_forced_posts, len(active_posting_bots))
-                )
+                forced_bots = self.model.random.sample(active_posting_bots, bot_count)
 
                 # React to each forced bot post
                 for bot in forced_bots:
-                    # Use the same reaction mechanism as for connected posts
                     self.react_to_post(bot)
 
     def react_to_post(self, other_agent):

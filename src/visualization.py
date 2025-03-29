@@ -611,13 +611,16 @@ def QuadrantDashboard():
     bot_ban_rate_multiplier, set_bot_ban_rate_multiplier = solara.use_state(constants.DEFAULT_BOT_BAN_RATE_MULTIPLIER)
 
     # Topic and interaction parameters
-    human_human_positive_bias, set_human_human_positive_bias = solara.use_state(constants.DEFAULT_HUMAN_HUMAN_POSITIVE_BIAS)
+    human_human_positive_bias, set_human_human_positive_bias = solara.use_state(
+        constants.DEFAULT_HUMAN_HUMAN_POSITIVE_BIAS)
     human_bot_negative_bias, set_human_bot_negative_bias = solara.use_state(constants.DEFAULT_HUMAN_BOT_NEGATIVE_BIAS)
     human_satisfaction_init, set_human_satisfaction_init = solara.use_state(constants.DEFAULT_HUMAN_SATISFACTION_INIT)
 
     # Network parameters
     network_stability, set_network_stability = solara.use_state(constants.DEFAULT_NETWORK_STABILITY)
     topic_shift_frequency, set_topic_shift_frequency = solara.use_state(constants.DEFAULT_TOPIC_SHIFT_FREQUENCY)
+
+    forced_feed_probability, set_forced_feed_probability = solara.use_state(constants.DEFAULT_FORCED_FEED_PROBABILITY)
 
     # Seed for reproducibility
     seed, set_seed = solara.use_state(42)
@@ -649,6 +652,8 @@ def QuadrantDashboard():
             human_human_positive_bias=human_human_positive_bias,
             human_bot_negative_bias=human_bot_negative_bias,
             human_satisfaction_init=human_satisfaction_init,
+            forced_feed_probability=forced_feed_probability,
+
             seed=seed
         )
 
@@ -759,19 +764,19 @@ def QuadrantDashboard():
     with solara.Column():
         # Title
         solara.Title("Social Media Simulation with Quadrant-Based Topic Space")
-        solara.Markdown("This simulation models social media platform dynamics in a 2D topic space with bots and human users.")
+        solara.Markdown(
+            "This simulation models social media platform dynamics in a 2D topic space with bots and human users.")
 
         # First row - Parameters and Controls
         with solara.Columns([1, 1, 2]):
             # Left column - Parameters
             with solara.Card("Simulation Parameters"):
-                # Warning if parameters have changed
-                if params_changed:
-                    solara.Info("⚠️ Parameters have changed.", style={"color": "orange", "fontWeight": "bold"})
-                    solara.Button(
-                        label="Apply Changes",
-                        on_click=create_new_model
-                    )
+                # Apply Changes button always visible at the top
+                solara.Button(
+                    label="Apply Changes",
+                    on_click=create_new_model,
+                    style={"marginBottom": "10px"}
+                )
 
                 # Population parameters
                 solara.Markdown("### Initial Population")
@@ -820,6 +825,15 @@ def QuadrantDashboard():
                     step=0.1,
                     value=bot_ban_rate_multiplier,
                     on_value=lambda v: update_param(v, set_bot_ban_rate_multiplier)
+                )
+
+                solara.SliderFloat(
+                    label="Non-follower Feed Probability",
+                    min=0.0,
+                    max=1.0,
+                    step=0.05,
+                    value=forced_feed_probability,
+                    on_value=lambda v: update_param(v, set_forced_feed_probability)
                 )
 
                 # Network parameters (shortened section)
@@ -877,13 +891,13 @@ def QuadrantDashboard():
                     with solara.Card("Current State"):
                         solara.Markdown(f"""
                         **Step:** {sim_state.steps}
-                        
+
                         **Active Humans:** {sim_state.active_humans}
-                        
+
                         **Active Bots:** {sim_state.active_bots}
-                        
+
                         **Human:Bot Ratio:** {sim_state.active_humans / max(1, sim_state.active_bots):.2f}
-                        
+
                         **Avg Satisfaction:** {sim_state.get_avg_human_satisfaction():.1f}
                         """)
 

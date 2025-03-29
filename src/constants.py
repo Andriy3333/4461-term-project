@@ -8,15 +8,15 @@ DEFAULT_INITIAL_HUMANS = 184
 DEFAULT_INITIAL_BOTS = 16
 
 # Forced feed parameters
-DEFAULT_FORCED_FEED_PROBABILITY = 1  # 30% chance of seeing forced bot content
-DEFAULT_FORCED_FEED_MAX_POSTS = 2  # Maximum number of forced posts per step
+DEFAULT_FORCED_FEED_PROBABILITY = 0.65  # 30% chance of seeing forced bot content
+DEFAULT_FORCED_FEED_MAX_POSTS = 5  # Maximum number of forced posts per step
 
 # Growth rates - calibrated to reach 2025 targets (~480 humans, ~120 bots by step 50)
-DEFAULT_HUMAN_CREATION_RATE = 6.0
-DEFAULT_BOT_CREATION_RATE = 2.1
+DEFAULT_HUMAN_CREATION_RATE = 3.0
+DEFAULT_BOT_CREATION_RATE = 3.0
 
 # Bot ban rate multiplier (allows adjusting detection/ban rate)
-DEFAULT_BOT_BAN_RATE_MULTIPLIER = 1.0
+DEFAULT_BOT_BAN_RATE_MULTIPLIER = 0
 
 # Network parameters
 DEFAULT_CONNECTION_REWIRING_PROB = 0.1
@@ -24,9 +24,9 @@ DEFAULT_NETWORK_STABILITY = 0.9
 DEFAULT_TOPIC_SHIFT_FREQUENCY = 5
 
 # Interaction parameters
-DEFAULT_HUMAN_HUMAN_POSITIVE_BIAS = 0.7
+DEFAULT_HUMAN_HUMAN_POSITIVE_BIAS = 0.5
 DEFAULT_HUMAN_BOT_NEGATIVE_BIAS = 0.8
-DEFAULT_HUMAN_SATISFACTION_INIT = 80
+DEFAULT_HUMAN_SATISFACTION_INIT = 90
 
 # Connection parameters
 DEFAULT_CONNECTION_FORMATION_CHANCE = 0.1
@@ -95,7 +95,7 @@ DEFAULT_PROXIMITY_CONNECTION_PROBABILITY = 0.1  # Base probability for forming c
 DEFAULT_GRID_RESOLUTION = 100  # Grid resolution for topic space
 
 # Agent processing parameters
-DEFAULT_AGENTS_TO_PROCESS_PER_STEP = 20  # Maximum agents to process per step
+DEFAULT_AGENTS_TO_PROCESS_PER_STEP = 10  # Maximum agents to process per step
 
 # Connection parameters (additional)
 DEFAULT_CONNECTION_BREAKING_BASE_PROB = 0.02  # Base probability for breaking connections
@@ -150,5 +150,5 @@ DEFAULT_TYPE_QUADRANT_BIAS_WEIGHT = 0.3  # Weight for type quadrant bias
 
 # General parameters
 DEFAULT_SIMULATION_START_DATE = date(2022, 1, 1)  # Start date for simulation
-DEFAULT_HUMAN_CONNECTION_LIMIT = 20  # Connection limit for humans
-DEFAULT_BOT_CONNECTION_LIMIT = 50  # Connection limit for bots
+DEFAULT_HUMAN_CONNECTION_LIMIT = 8  # Connection limit for humans
+DEFAULT_BOT_CONNECTION_LIMIT = 8  # Connection limit for bots

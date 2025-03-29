@@ -43,6 +43,8 @@ class QuadrantTopicModel(mesa.Model):
             human_bot_negative_bias=constants.DEFAULT_HUMAN_BOT_NEGATIVE_BIAS,
             human_satisfaction_init=constants.DEFAULT_HUMAN_SATISFACTION_INIT,
 
+            forced_feed_probability=constants.DEFAULT_FORCED_FEED_PROBABILITY,
+
             # Seed for reproducibility
             seed=None
     ):
@@ -60,6 +62,8 @@ class QuadrantTopicModel(mesa.Model):
         self.bot_ban_rate_multiplier = bot_ban_rate_multiplier
         self.network_stability = network_stability
         self.topic_shift_frequency = topic_shift_frequency
+
+        self.forced_feed_probability = forced_feed_probability
 
         # Interaction parameters
         self.human_human_positive_bias = human_human_positive_bias
