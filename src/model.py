@@ -33,6 +33,8 @@ class QuadrantTopicModel(mesa.Model):
             # Network parameters
             network_stability=constants.DEFAULT_NETWORK_STABILITY,
 
+
+
             # Topic parameters
             topic_shift_frequency=constants.DEFAULT_TOPIC_SHIFT_FREQUENCY,
 
@@ -87,6 +89,9 @@ class QuadrantTopicModel(mesa.Model):
 
         # Initialize data collector
         self.initialize_data_collector()
+
+        # Create bot network connections
+        self.create_bot_network_connections()
 
     def initialize_topic_space(self):
         """
@@ -673,6 +678,54 @@ class QuadrantTopicModel(mesa.Model):
                 # Form connection with calculated probability
                 if self.random.random() < connect_prob:
                     human.add_connection(other)
+
+    def create_bot_network_connections(self):
+        """
+        Create network connections between bots in the same quadrant.
+        Each bot will connect to 4-5 other bots in their quadrant.
+        """
+        # Group active bots by quadrant
+        bots_by_quadrant = {
+            'tech_business': [],
+            'politics_news': [],
+            'hobbies': [],
+            'pop_culture': []
+        }
+
+        # Find all active bots and group them by quadrant
+        for agent in self.agents:
+            if agent.active and agent.agent_type == "bot":
+                quadrant = agent.get_current_quadrant()
+                bots_by_quadrant[quadrant].append(agent)
+
+        # For each quadrant, create the bot network connections
+        for quadrant, bots in bots_by_quadrant.items():
+            # Skip if not enough bots in this quadrant
+            if len(bots) <= 1:
+                continue
+
+            for bot in bots:
+                # Determine how many connections to make (4-5)
+                num_connections = self.random.randint(4, 5)
+
+                # Make sure we don't try to connect to more bots than available
+                num_connections = min(num_connections, len(bots) - 1)
+
+                # Get potential connection targets (all other bots in same quadrant)
+                potential_targets = [other for other in bots if other.unique_id != bot.unique_id]
+
+                # If we have enough bots for the desired connections
+                if potential_targets and num_connections > 0:
+                    # Select random bots to connect with
+                    targets = self.random.sample(potential_targets, num_connections)
+
+                    # Create connections
+                    for target in targets:
+                        bot.add_connection(target)
+
+                        # Add some reciprocal connections (but not all)
+                        if self.random.random() < 0.7:  # 70% chance for reciprocal connection
+                            target.add_connection(bot)
 
     def step(self):
         """Advance the model by one step."""
