@@ -820,7 +820,7 @@ def QuadrantDashboard():
 
                 solara.SliderFloat(
                     label="Bot Ban Rate Multiplier",
-                    min=0.1,
+                    min=0.0,
                     max=2.0,
                     step=0.1,
                     value=bot_ban_rate_multiplier,

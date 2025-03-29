@@ -116,29 +116,81 @@ class HumanAgent(SocialMediaAgent):
             return 'pop_culture'    # Q4: Casual-Societal (Pop Culture)
 
     def move_in_topic_space(self):
-        """Move in 2D topic space with persistent target selection."""
-
+        """
+        Move in 2D topic space while maintaining the target quadrant distribution.
+        This enhanced version considers both individual preferences and global distribution goals.
+        """
         # Initialize persistent properties if they don't exist
         if not hasattr(self, 'target_commitment'):
             self.target_commitment = 0
             self.current_target_quadrant = None
-            self.target_x = None
-            self.target_y = None
+
+        # Initialize target coordinates if they don't exist
+        if not hasattr(self, 'target_x') or not hasattr(self, 'target_y'):
+            self.target_x = self.topic_position['x']
+            self.target_y = self.topic_position['y']
 
         # Check if we need to select a new target
         if self.target_commitment <= 0 or self.current_target_quadrant is None:
-            # Get quadrant attractiveness values from model
-            quadrant_attractiveness = getattr(self.model, 'human_quadrant_attractiveness', {
+            # Get the target quadrant attractiveness from the model
+            target_distribution = getattr(self.model, 'human_quadrant_attractiveness', {
                 'tech_business': 0.15,
                 'politics_news': 0.20,
                 'hobbies': 0.34,
                 'pop_culture': 0.50
             })
 
-            # Calculate movement weights based on preferences and attractiveness
+            # Get current actual distribution
+            current_distribution = {}
+            human_dist, _ = self.model.get_agent_quadrant_distribution()
+
+            # Calculate total humans for percentage calculation
+            total_humans = sum(human_dist.values())
+            if total_humans > 0:
+                for quadrant in human_dist:
+                    current_distribution[quadrant] = human_dist[quadrant] / total_humans
+            else:
+                current_distribution = target_distribution.copy()
+
+            # Calculate quadrant pressure: negative = overpopulated, positive = underpopulated
+            quadrant_pressure = {}
+            for quadrant in target_distribution:
+                target_pct = target_distribution[quadrant]
+                current_pct = current_distribution.get(quadrant, 0)
+                # Pressure is proportional to how far we are from target
+                quadrant_pressure[quadrant] = target_pct - current_pct
+
+            # Get current quadrant
+            current_quadrant = self.get_current_quadrant()
+
+            # Combine quadrant pressure with personal preferences to get movement weights
             movement_weights = {}
             for quadrant in self.quadrant_preferences:
-                movement_weights[quadrant] = (self.quadrant_preferences[quadrant])
+                # Base weight from personal preference
+                base_weight = self.quadrant_preferences[quadrant]
+
+                # Adjustment from quadrant pressure
+                pressure = quadrant_pressure.get(quadrant, 0)
+
+                # Negative pressure (overpopulated) reduces weight
+                # Positive pressure (underpopulated) increases weight
+                pressure_factor = 1.0 + (pressure * 2.0)  # Scale pressure effect
+
+                # If super user, less influenced by pressure
+                if getattr(self, 'is_super_user', False):
+                    pressure_factor = 1.0 + (pressure * 0.5)  # Reduced pressure effect
+
+                # Calculate final weight
+                movement_weights[quadrant] = base_weight * pressure_factor
+
+                # If already in this quadrant, add inertia bonus
+                if quadrant == current_quadrant:
+                    # Regular users have higher inertia - super users are more mobile
+                    inertia = 1.5 if not getattr(self, 'is_super_user', False) else 1.1
+                    movement_weights[quadrant] *= inertia
+
+                # Ensure weights don't go negative
+                movement_weights[quadrant] = max(0.1, movement_weights[quadrant])
 
             # Normalize weights
             weight_sum = sum(movement_weights.values())
@@ -162,20 +214,28 @@ class HumanAgent(SocialMediaAgent):
             elif self.current_target_quadrant == 'pop_culture':
                 self.target_x, self.target_y = 0.75, 0.75  # Q4 center
 
-            # Add randomness to target
-            self.target_x += self.model.random.uniform(-0.15, 0.15)
-            self.target_y += self.model.random.uniform(-0.15, 0.15)
+            # Add randomness to target, less for super users who are more focused
+            random_range = 0.10 if getattr(self, 'is_super_user', False) else 0.15
+            self.target_x += self.model.random.uniform(-random_range, random_range)
+            self.target_y += self.model.random.uniform(-random_range, random_range)
 
             # Ensure values stay within [0,1]
             self.target_x = max(0, min(1, self.target_x))
             self.target_y = max(0, min(1, self.target_y))
 
-            # Set commitment period (5-15 steps)
-            self.target_commitment = self.model.random.randint(5, 15)
+            # Set commitment period
+            base_commitment = self.model.random.randint(5, 15)
 
-            # Super users have longer commitment periods
-            if hasattr(self, 'is_super_user') and self.is_super_user:
-                self.target_commitment *= 2
+            # Super users have longer commitment periods to create stable communities
+            if getattr(self, 'is_super_user', False):
+                self.target_commitment = base_commitment * 2
+            else:
+                self.target_commitment = base_commitment
+
+            # If moving to an underpopulated quadrant, increase commitment
+            # This helps stabilize the distribution
+            if quadrant_pressure.get(self.current_target_quadrant, 0) > 0.05:
+                self.target_commitment = int(self.target_commitment * 1.5)
 
         # Decrement commitment counter
         self.target_commitment -= 1
@@ -194,7 +254,7 @@ class HumanAgent(SocialMediaAgent):
             return
 
         # Get forced feed ratio from constants
-        forced_feed_ratio = constants.DEFAULT_FORCED_FEED_PROBABILITY
+        forced_feed_ratio = getattr(self.model, "forced_feed_probability", constants.DEFAULT_FORCED_FEED_PROBABILITY)
 
         # Determine base number of posts to see (based on user's activeness)
         base_post_count = max(3, int(10 * self.activeness))

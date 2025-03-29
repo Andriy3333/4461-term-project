@@ -421,27 +421,114 @@ class QuadrantTopicModel(mesa.Model):
         return nearby_agents
 
     def create_new_agents(self):
-        """Create new agents based on creation rates."""
+        """Create new agents based on creation rates with quadrant distribution control."""
         # Track if we added any agents
         agents_added = False
+
+        # Get current quadrant distribution
+        human_dist, bot_dist = self.get_agent_quadrant_distribution()
+
+        # Calculate total counts
+        total_humans = sum(human_dist.values())
+        total_bots = sum(bot_dist.values())
+
+        # Calculate current distribution percentages
+        current_human_distribution = {}
+        if total_humans > 0:
+            for quadrant in human_dist:
+                current_human_distribution[quadrant] = human_dist[quadrant] / total_humans
+        else:
+            current_human_distribution = self.human_quadrant_attractiveness.copy()
+
+        current_bot_distribution = {}
+        if total_bots > 0:
+            for quadrant in bot_dist:
+                current_bot_distribution[quadrant] = bot_dist[quadrant] / total_bots
+        else:
+            current_bot_distribution = self.bot_quadrant_attractiveness.copy()
 
         # Create new humans - Use np_random for Poisson distribution
         num_new_humans = self.np_random.poisson(self.human_creation_rate)
         new_humans = []
+
+        # Create humans with quadrant distribution control
         for _ in range(num_new_humans):
+            # Calculate quadrant placement weights based on target vs current distribution
+            placement_weights = {}
+            for quadrant, target_pct in self.human_quadrant_attractiveness.items():
+                current_pct = current_human_distribution.get(quadrant, 0)
+                # Higher weight for underpopulated quadrants
+                imbalance = target_pct - current_pct
+                # Convert imbalance to a positive weight (1.0 is neutral)
+                weight = 1.0 + (imbalance * 5.0)  # Scale factor for stronger correction
+                # Ensure weight is positive
+                placement_weights[quadrant] = max(0.1, weight)
+
+            # Normalize weights
+            weight_sum = sum(placement_weights.values())
+            for quadrant in placement_weights:
+                placement_weights[quadrant] /= weight_sum
+
+            # Choose quadrant based on weights
+            target_quadrant = self.random.choices(
+                list(placement_weights.keys()),
+                weights=list(placement_weights.values()),
+                k=1
+            )[0]
+
+            # Create agent
             agent = HumanAgent(model=self)
             self.active_humans += 1
+
+            # Set position in target quadrant with some randomness
+            self.set_agent_position_in_quadrant(agent, target_quadrant)
+
+            # Set the agent's target quadrant and commitment
+            agent.current_target_quadrant = target_quadrant
+            agent.target_commitment = self.random.randint(10, 20)  # Higher initial commitment
 
             # Place agent in topic space
             self.place_agent_in_topic_space(agent)
             new_humans.append(agent)
             agents_added = True
 
+            # Update current distribution for next agent placement
+            human_dist[target_quadrant] += 1
+            total_humans += 1
+            for quadrant in human_dist:
+                current_human_distribution[quadrant] = human_dist[quadrant] / total_humans
+
         # Create new bots - Use np_random for Poisson distribution
         num_new_bots = self.np_random.poisson(self.bot_creation_rate)
         new_bots = []
+
+        # Create bots with quadrant distribution control
         for _ in range(num_new_bots):
-            agent = BotAgent(model=self)
+            # Calculate quadrant placement weights based on target vs current distribution
+            placement_weights = {}
+            for quadrant, target_pct in self.bot_quadrant_attractiveness.items():
+                current_pct = current_bot_distribution.get(quadrant, 0)
+                # Higher weight for underpopulated quadrants
+                imbalance = target_pct - current_pct
+                # Convert imbalance to a positive weight (1.0 is neutral)
+                weight = 1.0 + (imbalance * 5.0)  # Scale factor for stronger correction
+                # Ensure weight is positive
+                placement_weights[quadrant] = max(0.1, weight)
+
+            # Normalize weights
+            weight_sum = sum(placement_weights.values())
+            for quadrant in placement_weights:
+                placement_weights[quadrant] /= weight_sum
+
+            # Choose quadrant based on weights
+            target_quadrant = self.random.choices(
+                list(placement_weights.keys()),
+                weights=list(placement_weights.values()),
+                k=1
+            )[0]
+
+            # Create bot with specific quadrant for type distribution
+            agent = BotAgent(model=self, quadrant=target_quadrant)
 
             # Apply the bot ban rate multiplier to new bots
             if hasattr(agent, 'detection_rate'):
@@ -449,10 +536,19 @@ class QuadrantTopicModel(mesa.Model):
 
             self.active_bots += 1
 
+            # Set position in target quadrant with some randomness
+            self.set_agent_position_in_quadrant(agent, target_quadrant)
+
             # Place agent in topic space
             self.place_agent_in_topic_space(agent)
             new_bots.append(agent)
             agents_added = True
+
+            # Update current distribution for next agent placement
+            bot_dist[target_quadrant] += 1
+            total_bots += 1
+            for quadrant in bot_dist:
+                current_bot_distribution[quadrant] = bot_dist[quadrant] / total_bots
 
         # Connect new agents to existing agents based on proximity
         if agents_added:
@@ -731,14 +827,302 @@ class QuadrantTopicModel(mesa.Model):
                         if self.random.random() < 0.7:  # 70% chance for reciprocal connection
                             target.add_connection(bot)
 
+    def perform_bot_interactions(self):
+        """Make bots actively seek out and influence human agents."""
+        active_bots = [agent for agent in self.agents if agent.active and agent.agent_type == "bot"]
+        active_humans = [agent for agent in self.agents if agent.active and agent.agent_type == "human"]
+
+        if not active_bots or not active_humans:
+            return  # No bots or humans to interact
+
+        # For each bot, attempt to influence humans
+        for bot in active_bots:
+            # Only proceed if bot posted today
+            if not getattr(bot, 'posted_today', False):
+                continue
+
+            # Determine number of non-connected humans to try to influence
+            # based on bot type and quadrant
+            influence_count = 2  # Base number
+
+            # Adjust based on bot type
+            if bot.bot_type == "misinformation":
+                influence_count += 2  # More aggressive influence
+            elif bot.bot_type == "astroturfing":
+                influence_count += 1  # Moderate influence
+
+            # Get humans who aren't already connected to this bot
+            unconnected_humans = [human for human in active_humans
+                                  if human.unique_id not in bot.connections]
+
+            # Filter to humans in the same quadrant (for more targeted influence)
+            bot_quadrant = bot.get_current_quadrant()
+            targeted_humans = [human for human in unconnected_humans
+                               if human.get_current_quadrant() == bot_quadrant]
+
+            # If not enough humans in same quadrant, use any unconnected humans
+            if len(targeted_humans) < influence_count and unconnected_humans:
+                additional_humans = [h for h in unconnected_humans if h not in targeted_humans]
+                targeted_humans.extend(additional_humans)
+
+            # Limit to the target influence count
+            if targeted_humans and influence_count > 0:
+                humans_to_influence = self.random.sample(
+                    targeted_humans,
+                    min(influence_count, len(targeted_humans))
+                )
+
+                # Attempt to influence each human
+                for human in humans_to_influence:
+                    # Calculate chance of successful influence based on bot type
+                    influence_chance = 0.3  # Base chance
+
+                    # Adjust based on bot type
+                    if bot.bot_type == "misinformation" and bot_quadrant == "politics_news":
+                        influence_chance = 0.5  # Higher in politics for misinfo
+                    elif bot.bot_type == "astroturfing" and bot_quadrant == "tech_business":
+                        influence_chance = 0.5  # Higher in tech for astroturfing
+                    elif bot.bot_type == "spam" and bot_quadrant in ["pop_culture", "hobbies"]:
+                        influence_chance = 0.4  # Higher in casual quadrants for spam
+
+                    # Reduce influence chance based on human authenticity
+                    if hasattr(human, 'authenticity'):
+                        influence_chance *= (2.0 - human.authenticity)
+
+                    # Attempt influence
+                    if self.random.random() < influence_chance:
+                        # Calculate impact on satisfaction
+                        base_impact = -0.5  # Base negative impact
+
+                        # Adjust based on bot post type
+                        if bot.post_type == "misinformation":
+                            base_impact = -1.0
+                        elif bot.post_type == "astroturfing":
+                            base_impact = -0.8
+                        elif bot.post_type == "spam":
+                            base_impact = -0.5
+
+                        # Scale by human irritability
+                        if hasattr(human, 'irritability'):
+                            base_impact *= human.irritability
+
+                        # Apply impact
+                        human.satisfaction += base_impact * 5  # Scale for noticeable effect
+
+                        # Cap satisfaction
+                        human.satisfaction = max(0, min(100, human.satisfaction))
+
+                        # With small chance, create connection
+                        if self.random.random() < 0.1:  # 10% chance
+                            bot.add_connection(human)
+
+                            # Even smaller chance for reciprocal connection
+                            if self.random.random() < 0.05:  # 5% chance
+                                human.add_connection(bot)
+
+    def enforce_quadrant_distribution(self):
+        """
+        Enforce the target quadrant distribution by selectively moving agents.
+        Called periodically to maintain distribution close to targets.
+        """
+        # Only enforce every 5 steps to allow natural movement between corrections
+        if self.steps % 5 != 0:
+            return
+
+        # Get target distribution
+        target_distribution = self.human_quadrant_attractiveness
+
+        # Get current distribution
+        human_dist, _ = self.get_agent_quadrant_distribution()
+
+        # Calculate total humans for percentage calculation
+        total_humans = sum(human_dist.values())
+        if total_humans == 0:
+            return  # No humans to distribute
+
+        current_distribution = {}
+        for quadrant in human_dist:
+            current_distribution[quadrant] = human_dist[quadrant] / total_humans
+
+        # Calculate quadrant imbalance
+        quadrant_imbalance = {}
+        for quadrant in target_distribution:
+            target_pct = target_distribution[quadrant]
+            current_pct = current_distribution.get(quadrant, 0)
+            quadrant_imbalance[quadrant] = current_pct - target_pct
+
+        # Identify overpopulated and underpopulated quadrants
+        overpopulated = {q: imbalance for q, imbalance in quadrant_imbalance.items() if imbalance > 0.02}
+        underpopulated = {q: -imbalance for q, imbalance in quadrant_imbalance.items() if imbalance < -0.02}
+
+        # If there's nothing to correct, exit
+        if not overpopulated or not underpopulated:
+            return
+
+        # Sort quadrants by degree of imbalance
+        overpopulated_quadrants = sorted(overpopulated.keys(), key=lambda q: overpopulated[q], reverse=True)
+        underpopulated_quadrants = sorted(underpopulated.keys(), key=lambda q: underpopulated[q], reverse=True)
+
+        # Get all active human agents
+        active_humans = [agent for agent in self.agents if agent.active and agent.agent_type == "human"]
+
+        # For each overpopulated quadrant, move some agents to underpopulated quadrants
+        for over_q in overpopulated_quadrants:
+            # Calculate how many agents to move (proportional to imbalance)
+            imbalance_pct = overpopulated[over_q]
+            agents_to_move = int(total_humans * imbalance_pct * 0.2)  # Move 20% of the imbalance
+            agents_to_move = max(1, min(5, agents_to_move))  # At least 1, at most 5 agents per step
+
+            # Find agents in this quadrant
+            agents_in_quadrant = [agent for agent in active_humans if agent.get_current_quadrant() == over_q]
+
+            # Exclude super users from forced movement, they're community anchors
+            non_super_agents = [agent for agent in agents_in_quadrant
+                                if not getattr(agent, 'is_super_user', False)]
+
+            # If not enough non-super agents, reduce the move count
+            agents_to_move = min(agents_to_move, len(non_super_agents))
+
+            if agents_to_move == 0 or not underpopulated_quadrants:
+                continue
+
+            # Select agents to move (prefer those who recently moved or have low commitment)
+            agents_to_relocate = []
+            if non_super_agents:
+                # Sort by commitment - lower commitment means easier to move
+                sorted_agents = sorted(non_super_agents,
+                                       key=lambda a: getattr(a, 'target_commitment', 0))
+                agents_to_relocate = sorted_agents[:agents_to_move]
+
+            # For each agent, assign a new target in an underpopulated quadrant
+            for agent in agents_to_relocate:
+                # Choose an underpopulated quadrant
+                target_quadrant = underpopulated_quadrants[0]
+
+                # Rotate underpopulated quadrants list to distribute agents evenly
+                underpopulated_quadrants = underpopulated_quadrants[1:] + [underpopulated_quadrants[0]]
+
+                # Set new target for agent
+                agent.current_target_quadrant = target_quadrant
+
+                # Reset commitment to ensure immediate movement
+                agent.target_commitment = 0
+
+                # Calculate target coordinates for new quadrant
+                if target_quadrant == 'tech_business':
+                    target_x, target_y = 0.25, 0.25  # Q1 center
+                elif target_quadrant == 'politics_news':
+                    target_x, target_y = 0.25, 0.75  # Q2 center
+                elif target_quadrant == 'hobbies':
+                    target_x, target_y = 0.75, 0.25  # Q3 center
+                else:  # pop_culture
+                    target_x, target_y = 0.75, 0.75  # Q4 center
+
+                # Add some randomness to avoid clustering
+                target_x += self.random.uniform(-0.15, 0.15)
+                target_y += self.random.uniform(-0.15, 0.15)
+
+                # Ensure coordinates are within bounds
+                target_x = max(0, min(1, target_x))
+                target_y = max(0, min(1, target_y))
+
+                # Set new target
+                agent.target_x = target_x
+                agent.target_y = target_y
+
+    def force_bot_connections(self, min_connections=5):
+        """
+        Force bot-to-bot connections regardless of other factors.
+        This is a direct, brute-force approach that guarantees bot connectivity.
+        Call this from the model's step method.
+
+        Parameters:
+        -----------
+        min_connections : int
+            Minimum number of bot-to-bot connections each bot should have
+        """
+        # Get all active bots
+        active_bots = [agent for agent in self.agents
+                       if agent.active and agent.agent_type == "bot"]
+
+        # Skip if not enough bots
+        if len(active_bots) <= 1:
+            return
+
+        # Ensure each bot has minimum connections with other bots
+        for bot in active_bots:
+            # Count current bot connections
+            bot_connections = []
+            for conn_id in bot.connections:
+                other = self.get_agent_by_id(conn_id)
+                if other and other.active and other.agent_type == "bot":
+                    bot_connections.append(other)
+
+            current_bot_connections = len(bot_connections)
+
+            # If the bot needs more connections
+            if current_bot_connections < min_connections:
+                # Get all bots that aren't already connected
+                available_bots = [other for other in active_bots
+                                  if other.unique_id != bot.unique_id and
+                                  other.unique_id not in bot.connections]
+
+                # Sort by quadrant similarity - prefer same quadrant
+                bot_quadrant = bot.get_current_quadrant()
+                same_quadrant = [other for other in available_bots
+                                 if other.get_current_quadrant() == bot_quadrant]
+                other_quadrant = [other for other in available_bots
+                                  if other.get_current_quadrant() != bot_quadrant]
+
+                # Combine lists with priority (same quadrant first)
+                sorted_bots = same_quadrant + other_quadrant
+
+                # Calculate how many connections to add
+                connections_needed = min(min_connections - current_bot_connections,
+                                         len(sorted_bots))
+
+                # Add connections
+                for i in range(connections_needed):
+                    other_bot = sorted_bots[i]
+
+                    # Force bidirectional connection
+                    bot.connections.add(other_bot.unique_id)
+                    other_bot.connections.add(bot.unique_id)
+
+                    # Debug print
+                    print(f"FORCE connected bot {bot.unique_id} to bot {other_bot.unique_id}")
+
+        # Check connectivity after forcing connections
+        total_bots = len(active_bots)
+        connected_bots = 0
+
+        for bot in active_bots:
+            bot_connections = 0
+            for conn_id in bot.connections:
+                other = self.get_agent_by_id(conn_id)
+                if other and other.active and other.agent_type == "bot":
+                    bot_connections += 1
+
+            if bot_connections >= min_connections:
+                connected_bots += 1
+
+        # Calculate and print connectivity percentage
+        connectivity_pct = (connected_bots / total_bots) * 100 if total_bots > 0 else 0
+        print(
+            f"Bot connectivity: {connected_bots}/{total_bots} bots ({connectivity_pct:.1f}%) have {min_connections}+ bot connections")
+
     def step(self):
         """Advance the model by one step."""
+        # Step all agents in random order
         self.agents.shuffle_do("step")
 
         # Apply super user gravity to all agents
         for agent in self.agents:
             if agent.active and not getattr(agent, "is_super_user", False):
                 self.apply_super_user_gravity(agent)
+
+        # Enforce quadrant distribution (new)
+        self.enforce_quadrant_distribution()
 
         # Update agent positions in the topic space
         self.update_agent_positions()
@@ -751,6 +1135,11 @@ class QuadrantTopicModel(mesa.Model):
 
         # Form echo chamber connections based on topic proximity
         self.form_echo_chamber_connections()
+
+        # Perform active bot interaction with humans
+        self.perform_bot_interactions()
+
+        self.force_bot_connections(min_connections=5)
 
         # Apply natural connection decay
         self.decay_connections()

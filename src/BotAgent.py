@@ -155,26 +155,6 @@ class BotAgent(SocialMediaAgent):
         else:
             return 'pop_culture'    # Q4: Casual-Societal (Pop Culture)
 
-    def step(self):
-        """Bot agent behavior during each step."""
-        super().step()
-
-        if not self.active:
-            return
-
-        # Update bot parameters based on current quadrant
-        self.configure_bot_type()
-
-        # Post with some probability
-        self.bot_post()
-
-        # Check if bot gets banned
-        self.check_ban()
-
-        # Possibly shift topic position slightly (limited mobility)
-        if self.model.random.random() < 0.05:  # 5% chance to shift
-            self.shift_topic()
-
     def check_ban(self):
         """Check if the bot gets banned."""
         # Modify detection rate based on quadrant and time spent
@@ -192,7 +172,7 @@ class BotAgent(SocialMediaAgent):
             self.deactivate()
 
     def bot_post(self):
-        """Create a post with some probability."""
+        """Create a post with some probability and actively attempt to spread it."""
         # Use model's RNG
         if self.model.random.random() < self.post_frequency:
             self.posted_today = True
@@ -213,8 +193,68 @@ class BotAgent(SocialMediaAgent):
                 self.create_malicious_post()
             else:
                 self.attempt_normal_post()
+
+            # ENHANCEMENT: Actively push posts to connected humans
+            # This creates a more direct impact mechanism
+            self.spread_posts_to_connections()
         else:
             self.posted_today = False
+
+    def spread_posts_to_connections(self):
+        """Actively spread posts to human connections to maximize impact."""
+        # Only proceed if the bot has posted today
+        if not self.posted_today:
+            return
+
+        # Get all human connections
+        human_connections = []
+        for conn_id in self.connections:
+            other = self.get_agent_by_id(conn_id)
+            if other and other.active and other.agent_type == "human":
+                human_connections.append(other)
+
+        # Calculate base impact based on bot type and post type
+        base_impact = -1.0  # Default negative impact
+
+        if self.post_type == "normal":
+            base_impact = -0.2  # Minimal negative impact for normal posts
+        elif self.post_type == "misinformation":
+            base_impact = -2.0  # Significant negative impact
+        elif self.post_type == "astroturfing":
+            base_impact = -1.5  # Moderate-high negative impact
+        elif self.post_type == "spam":
+            base_impact = -0.8  # Moderate negative impact
+
+        # For each human connection, attempt to affect their satisfaction
+        for human in human_connections:
+            # Scale impact based on human properties
+            scaled_impact = base_impact
+
+            # More authentic humans are less affected
+            if hasattr(human, 'authenticity'):
+                scaled_impact *= (2.0 - human.authenticity)
+
+            # More irritable humans are more affected
+            if hasattr(human, 'irritability'):
+                scaled_impact *= human.irritability
+
+            # Super users are more resistant
+            if hasattr(human, 'is_super_user') and human.is_super_user:
+                scaled_impact *= 0.7
+
+            # Apply the satisfaction impact with some randomness
+            # This simulates the human seeing and reacting to the post
+            if self.model.random.random() < 0.8:  # 80% chance of seeing the post
+                # Add random variance to impact
+                variance = self.model.random.uniform(0.8, 1.2)
+                final_impact = scaled_impact * variance
+
+                # Update human satisfaction
+                if hasattr(human, 'satisfaction'):
+                    human.satisfaction += final_impact
+
+                    # Cap satisfaction between 0 and 100
+                    human.satisfaction = max(0, min(100, human.satisfaction))
 
     def create_malicious_post(self):
         """Create a malicious post based on bot type."""
@@ -299,3 +339,149 @@ class BotAgent(SocialMediaAgent):
         # Move toward target (very gradual movement for bots)
         self.topic_position['x'] += self.topic_mobility * (target_x - self.topic_position['x'])
         self.topic_position['y'] += self.topic_mobility * (target_y - self.topic_position['y'])
+
+    """
+    BotAgent.py - Add connection maintenance to BotAgent class
+    """
+
+    def maintain_connections(self):
+        """
+        Aggressively maintain a target number of connections with both bots and humans.
+        This method is called during each bot's step to ensure connection targets are met.
+        """
+        if not self.active:
+            return
+
+        # Target number of connections for each type - make this explicit and guaranteed
+        target_bot_connections = 5  # Fixed target
+        target_human_connections = 5  # Fixed target
+
+        # Count current connections by type
+        bot_connections = []
+        human_connections = []
+
+        # Analyze existing connections
+        for conn_id in self.connections:
+            other = self.get_agent_by_id(conn_id)
+            if other and other.active:
+                if other.agent_type == "bot":
+                    bot_connections.append(other)
+                elif other.agent_type == "human":
+                    human_connections.append(other)
+
+        current_bot_connections = len(bot_connections)
+        current_human_connections = len(human_connections)
+
+        # PART 1: Aggressively maintain bot-to-bot connections
+        if current_bot_connections < target_bot_connections:
+            # Get all possible bot candidates
+            all_bots = [agent for agent in self.model.agents
+                        if agent.active and
+                        agent.agent_type == "bot" and
+                        agent.unique_id != self.unique_id and
+                        agent.unique_id not in self.connections]
+
+            # Prioritize bots in the same quadrant first
+            current_quadrant = self.get_current_quadrant()
+
+            # Separate bots by quadrant match
+            same_quadrant_bots = [b for b in all_bots if b.get_current_quadrant() == current_quadrant]
+            other_quadrant_bots = [b for b in all_bots if b.get_current_quadrant() != current_quadrant]
+
+            # Combine lists with priority (same quadrant first)
+            potential_bots = same_quadrant_bots + other_quadrant_bots
+
+            # If we have bot candidates, add connections until target is reached
+            num_to_add = target_bot_connections - current_bot_connections
+
+            for i in range(min(num_to_add, len(potential_bots))):
+                bot = potential_bots[i]
+
+                # Make direct connection
+                self.add_connection(bot)
+                bot.add_connection(self)  # Always make reciprocal for bot-bot
+                current_bot_connections += 1
+
+                # Print debug message if desired
+                # print(f"Bot {self.unique_id} connected to bot {bot.unique_id}")
+
+        # PART 2: Aggressively maintain bot-to-human connections
+        if current_human_connections < target_human_connections:
+            # Get all potential human candidates
+            all_humans = [agent for agent in self.model.agents
+                          if agent.active and
+                          agent.agent_type == "human" and
+                          agent.unique_id not in self.connections]
+
+            # Prioritize by quadrant preference based on bot type
+            current_quadrant = self.get_current_quadrant()
+            scored_humans = []
+
+            for human in all_humans:
+                human_quadrant = human.get_current_quadrant()
+                score = 0
+
+                # Base score
+                score = 1
+
+                # Quadrant matching based on bot type
+                if self.bot_type == "spam" and human_quadrant in ["pop_culture", "hobbies"]:
+                    score += 5
+                elif self.bot_type == "misinformation" and human_quadrant == "politics_news":
+                    score += 5
+                elif self.bot_type == "astroturfing" and human_quadrant == "tech_business":
+                    score += 5
+
+                # Super users are high-value targets
+                if getattr(human, 'is_super_user', False):
+                    score += 10
+
+                # Add to scored list
+                scored_humans.append((human, score))
+
+            # Sort by score (highest first)
+            scored_humans.sort(key=lambda x: x[1], reverse=True)
+
+            # Get top candidates
+            num_to_add = target_human_connections - current_human_connections
+            top_humans = [h[0] for h in scored_humans[:num_to_add]]
+
+            # Add connections to selected humans
+            for human in top_humans:
+                self.add_connection(human)
+
+                # Sometimes make humans connect back (with higher probability for super users)
+                if getattr(human, 'is_super_user', False):
+                    if self.model.random.random() < 0.7:  # 70% for super users
+                        human.add_connection(self)
+                else:
+                    if self.model.random.random() < 0.4:  # 40% for regular users
+                        human.add_connection(self)
+
+                current_human_connections += 1
+
+                # Print debug message if desired
+                # print(f"Bot {self.unique_id} connected to human {human.unique_id}")
+
+    def step(self):
+        """Bot agent behavior during each step."""
+        super().step()
+
+        if not self.active:
+            return
+
+        # Update bot parameters based on current quadrant
+        self.configure_bot_type()
+
+        # Maintain target connections with both bots and humans
+        self.maintain_connections()
+
+        # Post with some probability
+        self.bot_post()
+
+        # Check if bot gets banned
+        self.check_ban()
+
+        # Possibly shift topic position slightly (limited mobility)
+        if self.model.random.random() < 0.05:  # 5% chance to shift
+            self.shift_topic()
