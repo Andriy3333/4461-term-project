@@ -1,48 +1,33 @@
+
 # Social Media Simulation of Human Satisfaction with Bot Interaction
 
 By Yinkan Chen, Andriy Sapeha, Hongji Tang
 
-## A. Overview of Current Implementation
+## A. Overview of the Phenomenon Modeled
 
-This project simulates the effects of bot interactions on human user satisfaction in social media environments. As social media platforms become increasingly populated with AI-driven bots, we observe a phenomenon known as "enshittification" - a decline in user experience, growing distrust, and eventual user disengagement. Our simulation explores how bots contribute to this decline by interacting with both human users and other bots, ultimately shaping platform dynamics in a way that erodes trust and satisfaction.
+This project simulates the effects of AI-driven bots on human user satisfaction in social media environments. As social media platforms become increasingly populated with bots, we observe a phenomenon known as "enshittification" - a decline in user experience, growing distrust, and eventual user disengagement. Our simulation explores how bots contribute to this decline by interacting with both human users and other bots, ultimately shaping platform dynamics in ways that can erode trust and satisfaction.
 
-The current implementation features an agent-based model using Mesa 3.1.4 with:
+Our agent-based model features two primary agent types:
+- **Human Agents**: Users with satisfaction levels, topic interests, and varying interaction patterns
+- **Bot Agents**: Automated accounts of different types (spam, misinformation, astroturfing) with unique behavioral patterns
 
-1. **Two agent types:**
+The simulation takes place in a 2D topic space with four quadrants representing different discussion areas:
+- Q1 (0-0.5, 0-0.5): Tech/Business (Serious & Individual)
+- Q2 (0-0.5, 0.5-1): Politics/News (Serious & Societal)
+- Q3 (0.5-1, 0-0.5): Hobbies (Casual & Individual)
+- Q4 (0.5-1, 0.5-1): Pop Culture (Casual & Societal)
 
-   - **Human Agents**: Users with satisfaction levels, topic interests, and interaction patterns
-   - **Bot Agents**: Automated accounts of different types (spam, misinformation, astroturfing) that interact with humans and other bots
-
-2. **Small-world network structure:**
-
-   - Represents social connections between users
-   - Periodically rewired to simulate changing trends and topics
-
-3. **Interactive visualization:**
-
-   - Built with Solara 1.44.1
-   - Network graph visualization showing human and bot connections
-   - Satisfaction histogram and trend analysis
-   - Population dynamics visualization
-
-4. **Core simulation mechanics:**
-   - Human-to-human interactions (generally positive)
-   - Human-to-bot interactions (generally negative)
-   - Bot detection and removal system
-   - Satisfaction-based user retention
-   - Dynamic network evolution
-
-In our current simulation, bots and humans interact in a network structure where humans have satisfaction levels that decrease upon negative interactions with bots. Each agent type has specific behavior patterns, and the simulation tracks various metrics over time, including average human satisfaction, active population counts, and network structure changes.
+Agents move through this space based on preferences and interact with each other, with different interaction types affecting human satisfaction. The model incorporates realistic distributions of both humans and bots across topic areas based on research findings, with bots being concentrated in Tech/Business (56%) and Politics/News (27%) quadrants, while humans favor Pop Culture (50%) and Hobbies (34%).
 
 ## B. How to Run the Simulation
 
 ### Requirements
 
-This project requires Python 3.13 and the packages inside requirements.txt.
+This project requires Python 3.13 and the packages specified in requirements.txt.
 
 ### Installation
 
-1. Navigate to the unzipped project. Make sure you are in the project directory. :
+1. Clone the repository or navigate to the project directory:
 
    ```
    cd 4461-term-project/src
@@ -55,93 +40,56 @@ This project requires Python 3.13 and the packages inside requirements.txt.
 
 ### Running the Simulation
 
-There are two ways to run the simulation:
+#### Option 1: Interactive Visualization (Recommended)
 
-### 1. Using the Solara-based visualization (recommended):
-
-This is the primary method we used to run and visualize the simulation. It contains charts like current human satisfaction, and if you scroll down after starting the simulation it also shows population over time and satisfaction over time.
-Make sure you are in /src
+The Solara-based visualization provides an interactive dashboard with real-time charts and controls:
 
 ```
 solara run visualization.py
 ```
 
-This will start a web server, and you should see output with a URL (typically http://localhost:8765). Open this URL in your web browser to interact with the simulation dashboard.
+This will start a web server and display a URL (typically http://localhost:8765). Open this URL in your web browser to interact with the simulation dashboard.
 
-IMPORTANT:
+**Important:**
+1. After changing parameters, click "Apply Changes" to update the simulation.
+2. Use the step buttons (Step, Run 5 Steps, Run 10 Steps, Run 50 Steps) to advance the simulation.
 
-1. When changing parameters please click apply changes after.
-2. To go forward in the simulation click one of the step buttons
-
-- Controls for setting simulation parameters
+The dashboard includes:
+- Parameter controls (population, growth rates, interaction biases)
+- Topic space visualization showing agent distribution
+- Satisfaction histograms and trends
+- Population metrics over time
 - Network visualization
-- Satisfaction histogram
-- Population over time charts
+- Bot type distribution
 
-### 2. Blindly run the simulation and view the data:
+#### Option 2: Headless Simulation with Data Collection
 
-The sweep_config.json file defines the parameter combinations to explore:
-You can modify this file to test different parameter values by adding more options to each array. For example, to test multiple bot creation rates:
-"bot_creation_rate": [10, 20, 30]
-This would run the simulation with all three bot creation rate values while keeping other parameters constant.
+Run a non-interactive simulation and collect comprehensive data:
 
-#### Run with default settings
+```
+python run.py
+```
 
-python run_sweep.py
+This will execute a simulation with default parameters and save detailed results to the `results/` directory, including:
+- Time series data in CSV format
+- Network structures in GEXF format (viewable in tools like Gephi)
+- Detailed agent snapshots
+- Summary statistics
 
-#### Run with custom configuration file
+## C. Key Findings and Observations
 
-python run_sweep.py --config custom_sweep.json
+Our simulation yielded several interesting observations about the relationship between bot presence and human satisfaction on social media platforms:
 
-#### Run with custom steps and runs per configuration
+1. **Initial Impact**: The most significant drop in average user satisfaction occurs in the early stages of bot introduction. In our primary simulation, average satisfaction dropped from 90 to 67.8 during the first 10 steps, suggesting an initial shock effect.
 
-python run_sweep.py --steps 500 --runs 5
+2. **Stabilization Over Time**: Contrary to expectations, satisfaction levels tend to stabilize and even slightly increase over time despite growing bot populations. This suggests that more tolerant users remain on the platform while less tolerant users leave, creating a selection effect.
 
-#### Run with custom output directory
+3. **Quadrant-Specific Effects**: Satisfaction levels vary significantly by topic area. Tech/Business and Politics/News quadrants, which have higher bot concentrations, consistently show lower average satisfaction compared to Hobbies and Pop Culture quadrants.
 
-python run_sweep.py --output my_results
-The sweep results will be saved in the specified output directory (defaults to results/), including:
+4. **Bot Type Impact**: Different bot types affect satisfaction differently. Misinformation and astroturfing bots, concentrated in the "serious" quadrants (Tech/Business and Politics/News), cause more negative impacts than spam bots typically found in casual areas.
 
-A timestamped subdirectory for each sweep (e.g., sweep_20250315_120000/)
-Individual CSV files for each run with detailed time series data
-A summary.csv file with the final state of all runs
-A copy of the parameters.json used for the sweep
+5. **Super User Influence**: Super users (the 10% of human users who are most active) show higher resistance to negative bot interactions and play important roles in maintaining community structures.
 
-Analyzing Results
-After running a sweep, you can analyze the results using your preferred data analysis tools. The summary CSV file contains key metrics from each run, making it easy to compare different parameter configurations.
+6. **Network Formation**: The simulation reveals interesting network patterns where some users become isolated while others form dense connection clusters, sometimes bridging between quadrants.
 
-### Parameter Explanation
-
-- **Initial Population**: Starting number of human and bot agents
-- **Growth Rates**: Rate at which new humans and bots are added per step
-- **Connection Rewiring**: Probability of connections being rewired (higher values = more dynamic networks)
-- **Topic Shift Frequency**: How often major topic shifts occur (in steps)
-- **Human-Human Positive Bias**: Likelihood of positive interactions between humans
-- **Human-Bot Negative Bias**: Likelihood of negative interactions between humans and bots
-- **Initial Human Satisfaction**: Starting satisfaction level for human agents
-
-## C. Limitations and Planned Improvements
-
-### Current Limitations
-
-1. **Echo Chamber Mechanism**: The echo chamber formation mechanism has been disabled in the current prototype as it was causing humans and bots to become isolated from each other, as noted by our developer: "It was ruining the simulation as no matter the parameters given, the humans would eventually move into smaller and smaller groups while the bots were left on the periphery."
-
-2. **Parameter Calibration**: Finding the right balance between parameters has been challenging. As our developer noted: "Parameter tuning proved to be another time-consuming obstacle. Finding the right balance between human satisfaction decay rates, bot creation frequencies, and network rewiring probabilities took many iterations."
-
-3. **Specific Parameter Values**: While we have an idea of what ratios should be used, specific starting numbers haven't been fully determined yet, making it difficult to match the simulation to real-world data.
-
-4. **Implementation Refinement**: Some systems like the bot banning mechanism don't appear to be fully implemented yet in the current prototype.
-
-### Planned Improvements
-
-1. **Parameter Tuning**: Adjust parameters to achieve a more realistic simulation where bot growth and human satisfaction decay are balanced appropriately. Parameters need to be based on confirmed Twitter statistics.
-
-2. **Echo Chamber Mechanism**: Revisit the echo chamber system implementation to prevent the isolation issue, making it possible for bots and humans to meaningfully interact while still forming realistic community structures.
-
-3. **Bot Ban System Implementation**: Properly implement the system for banning bots that display suspicious behavior, which currently appears to be missing in the prototype.
-
-4. **Growth Rate Calibration**: Adjust human growth rate to better replicate Twitter's historical growth from approximately 200 million monthly active users in 2013 to 600 million in 2025, with nodes being proportional to those numbers.
-
-5. **Visualization Enhancements**: Polish the finer details of the simulation and agent visualization for proper results and visual representation of social media networks.
-
-6. **System Refinement**: Some systems may need more time to be fully realized or reimagined and implemented for proper results.
+While our model confirms that increased bot presence correlates with some decrease in satisfaction, the relationship is more complex than a simple negative correlation. The development of user tolerance, self-selection of more resilient users, and quadrant-specific effects all contribute to the overall dynamics of the system.
