@@ -1089,8 +1089,6 @@ class QuadrantTopicModel(mesa.Model):
                     bot.connections.add(other_bot.unique_id)
                     other_bot.connections.add(bot.unique_id)
 
-                    # Debug print
-                    print(f"FORCE connected bot {bot.unique_id} to bot {other_bot.unique_id}")
 
         # Check connectivity after forcing connections
         total_bots = len(active_bots)
@@ -1106,10 +1104,6 @@ class QuadrantTopicModel(mesa.Model):
             if bot_connections >= min_connections:
                 connected_bots += 1
 
-        # Calculate and print connectivity percentage
-        connectivity_pct = (connected_bots / total_bots) * 100 if total_bots > 0 else 0
-        print(
-            f"Bot connectivity: {connected_bots}/{total_bots} bots ({connectivity_pct:.1f}%) have {min_connections}+ bot connections")
 
     def step(self):
         """Advance the model by one step."""

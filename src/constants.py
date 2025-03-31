@@ -13,10 +13,10 @@ DEFAULT_FORCED_FEED_MAX_POSTS = 5  # Maximum number of forced posts per step
 
 # Growth rates - calibrated to reach 2025 targets (~480 humans, ~120 bots by step 50)
 DEFAULT_HUMAN_CREATION_RATE = 8
-DEFAULT_BOT_CREATION_RATE = 5.0
+DEFAULT_BOT_CREATION_RATE = 3
 
 # Bot ban rate multiplier (allows adjusting detection/ban rate)
-DEFAULT_BOT_BAN_RATE_MULTIPLIER = 2
+DEFAULT_BOT_BAN_RATE_MULTIPLIER = 1
 
 # Network parameters
 DEFAULT_CONNECTION_REWIRING_PROB = 0.1
